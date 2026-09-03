@@ -139,7 +139,13 @@
     display:flex; flex-direction:column; justify-content:center; gap:2px;
   }
   .card:hover{border-color:var(--gold);}
+  .card{padding:8px 12px;}
+  .card.has-photo{padding-left:8px;}
   .card .row1{display:flex; align-items:center; gap:7px;}
+  .card .avatar{
+    flex:none; width:34px; height:34px; border-radius:50%; object-fit:cover;
+    border:1.5px solid var(--line-strong); background:var(--surface-2);
+  }
   .card .glyph{flex:none; width:9px; height:9px;}
   .card .glyph.male{background:var(--male); transform:rotate(45deg); border-radius:2px;}
   .card .glyph.female{background:var(--female); border-radius:50%;}
@@ -147,6 +153,16 @@
   .card .name{font-size:14px; font-weight:700; line-height:1.2; overflow-wrap:anywhere;}
   .card .years{font-size:11.5px; color:var(--ink-muted); font-variant-numeric:tabular-nums; margin-left:16px;}
   .card .note{font-size:11px; color:var(--ink-faint); margin-left:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .card.has-photo .years, .card.has-photo .note{margin-left:41px;}
+
+  .avatar-picker{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
+  .avatar-picker .avatar-preview{
+    flex:none; width:64px; height:64px; border-radius:50%; object-fit:cover;
+    background:var(--surface); border:1.5px dashed var(--line-strong);
+  }
+  .avatar-picker .avatar-preview.filled{border-style:solid;}
+  .avatar-picker-actions{display:flex; flex-direction:column; gap:6px;}
+  .avatar-picker-actions .btn{padding:7px 12px; font-size:12.5px;}
 
   .fab{
     position:absolute; right:20px; bottom:22px; z-index:15;
@@ -670,8 +686,11 @@
       var glyphClass = p.gender === "m" ? "male" : (p.gender === "f" ? "female" : "unk");
       var years = "";
       if (p.birth || p.death) years = (p.birth||"?") + "–" + (p.death||"…");
-      nodesHtml += '<div class="card" tabindex="0" data-id="' + id + '" style="left:' + x + 'px; top:' + y + 'px;">' +
-        '<div class="row1"><span class="glyph ' + glyphClass + '"></span><span class="name">' + escapeHtml(p.name || "Без имени") + '</span></div>' +
+      var avatarHtml = p.photo
+        ? '<img class="avatar" src="' + escapeAttr(p.photo) + '" alt="">'
+        : '<span class="glyph ' + glyphClass + '"></span>';
+      nodesHtml += '<div class="card' + (p.photo ? ' has-photo' : '') + '" tabindex="0" data-id="' + id + '" style="left:' + x + 'px; top:' + y + 'px;">' +
+        '<div class="row1">' + avatarHtml + '<span class="name">' + escapeHtml(p.name || "Без имени") + '</span></div>' +
         (years ? '<div class="years">' + escapeHtml(years) + '</div>' : '') +
         (p.note ? '<div class="note">' + escapeHtml(p.note) + '</div>' : '') +
         '</div>';
@@ -895,13 +914,13 @@
   }
 
   function buildSheetHtml(mode){
-    var title, person, defaults = {name:"", gender:"u", birth:"", death:"", note:""};
+    var title, person, defaults = {name:"", gender:"u", birth:"", death:"", note:"", photo:""};
     if (mode.type === "edit"){
       person = state.people[mode.id];
       title = "Карточка человека";
       defaults = person;
     } else if (mode.type === "add-relative"){
-      var relLabels = {father:"Добавить отца", mother:"Добавить мать", spouse:"Добавить супруга / супругу", child:"Добавить ребёнка"};
+      var relLabels = {father:"Добавить отца", mother:"Добавить мать", spouse:"Добавить супруга / супругу", child:"Добавить ребёнка", sibling:"Добавить брата / сестру"};
       title = relLabels[mode.rel] || "Добавить родственника";
       defaults.gender = genderDefault(mode.rel, state.people[mode.forId]);
     } else {
@@ -910,6 +929,16 @@
 
     var html = '<h3>' + title + '</h3>';
     html += '<form id="personForm">';
+    html += '<div class="avatar-picker">' +
+      (defaults.photo
+        ? '<img class="avatar-preview filled" id="avatarPreview" src="' + escapeAttr(defaults.photo) + '">'
+        : '<img class="avatar-preview" id="avatarPreview">') +
+      '<div class="avatar-picker-actions">' +
+      '<button type="button" class="btn btn-ghost" id="avatarPickBtn">' + (defaults.photo ? 'Изменить фото' : 'Добавить фото') + '</button>' +
+      (defaults.photo ? '<button type="button" class="btn btn-ghost" id="avatarRemoveBtn">Убрать фото</button>' : '') +
+      '<input type="file" accept="image/*" capture="user" id="avatarFile" style="display:none;">' +
+      '</div></div>';
+    html += '<input type="hidden" name="photo" value="' + escapeAttr(defaults.photo||"") + '">';
     html += '<div class="field"><label>Имя и фамилия</label><input type="text" name="name" value="' + escapeAttr(defaults.name||"") + '" placeholder="Например, Асан уулу Бекболот" required></div>';
     html += '<div class="field"><label>Пол</label><div class="pillrow" id="genderPills">' +
       pillBtn("m","Мужчина",defaults.gender) + pillBtn("f","Женщина",defaults.gender) + pillBtn("u","Не указано",defaults.gender) +
@@ -927,7 +956,13 @@
       if (!person.motherId) rels += '<button data-rel="mother">+ Мать</button>';
       if (!person.spouseId) rels += '<button data-rel="spouse">+ Супруг(а)</button>';
       rels += '<button data-rel="child">+ Ребёнок</button>';
+      if (person.fatherId || person.motherId){
+        rels += '<button data-rel="sibling">+ Брат / сестра</button>';
+      }
       html += '<div class="divider"></div><div class="relations" id="relBtns">' + rels + '</div>';
+      if (!person.fatherId && !person.motherId){
+        html += '<p class="subnote">Чтобы добавить брата или сестру, сначала укажите отца или мать этого человека.</p>';
+      }
       html += '<div class="sheet-actions">' +
         '<button class="btn btn-primary" id="saveBtn">Сохранить</button>' +
         '<button class="btn btn-danger" id="deleteBtn">Удалить</button>' +
@@ -940,6 +975,31 @@
         '</div>';
     }
     return html;
+  }
+
+  // Photos live inside the shareable link itself (there is no server), so
+  // every photo is downscaled to a small square thumbnail and compressed
+  // hard before it's stored — otherwise a few full-size photos would blow
+  // the link up to megabytes and it would stop working as a link at all.
+  var AVATAR_PX = 128;
+  function resizePhotoFile(file, cb){
+    var reader = new FileReader();
+    reader.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var side = Math.min(img.width, img.height);
+        var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+        var canvas = document.createElement("canvas");
+        canvas.width = AVATAR_PX; canvas.height = AVATAR_PX;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, AVATAR_PX, AVATAR_PX);
+        cb(canvas.toDataURL("image/jpeg", 0.6));
+      };
+      img.onerror = function(){ cb(null); };
+      img.src = reader.result;
+    };
+    reader.onerror = function(){ cb(null); };
+    reader.readAsDataURL(file);
   }
 
   function pillBtn(val,label,current){
@@ -959,6 +1019,30 @@
       genderHidden.value = btn.getAttribute("data-val");
     });
 
+    var photoHidden = form.querySelector('input[name="photo"]');
+    var avatarPreview = document.getElementById("avatarPreview");
+    var avatarFile = document.getElementById("avatarFile");
+    document.getElementById("avatarPickBtn").addEventListener("click", function(){ avatarFile.click(); });
+    avatarFile.addEventListener("change", function(){
+      var file = avatarFile.files && avatarFile.files[0];
+      if (!file) return;
+      resizePhotoFile(file, function(dataUrl){
+        if (!dataUrl) return;
+        photoHidden.value = dataUrl;
+        avatarPreview.src = dataUrl;
+        avatarPreview.classList.add("filled");
+      });
+    });
+    var avatarRemoveBtn = document.getElementById("avatarRemoveBtn");
+    if (avatarRemoveBtn){
+      avatarRemoveBtn.addEventListener("click", function(){
+        photoHidden.value = "";
+        avatarPreview.removeAttribute("src");
+        avatarPreview.classList.remove("filled");
+        avatarRemoveBtn.remove();
+      });
+    }
+
     var relBtns = document.getElementById("relBtns");
     if (relBtns){
       relBtns.addEventListener("click", function(e){
@@ -976,13 +1060,14 @@
         gender: genderHidden.value,
         birth: form.birth.value.trim(),
         death: form.death.value.trim(),
-        note: form.note.value.trim()
+        note: form.note.value.trim(),
+        photo: photoHidden.value
       };
       if (!data.name){ form.name.focus(); return; }
 
       if (mode.type === "edit"){
         var p = state.people[mode.id];
-        p.name = data.name; p.gender = data.gender; p.birth = data.birth; p.death = data.death; p.note = data.note;
+        p.name = data.name; p.gender = data.gender; p.birth = data.birth; p.death = data.death; p.note = data.note; p.photo = data.photo;
       } else if (mode.type === "add-relative"){
         addRelative(mode.rel, mode.forId, data);
       } else {
@@ -1017,8 +1102,21 @@
 
     if (rel === "father"){
       forPerson.fatherId = id;
+      // If the other parent is already recorded, pair them as spouses —
+      // otherwise adding father and mother separately leaves them as two
+      // unrelated cards instead of a couple.
+      var existingMother = forPerson.motherId && state.people[forPerson.motherId];
+      if (existingMother && !existingMother.spouseId){
+        existingMother.spouseId = id;
+        np.spouseId = forPerson.motherId;
+      }
     } else if (rel === "mother"){
       forPerson.motherId = id;
+      var existingFather = forPerson.fatherId && state.people[forPerson.fatherId];
+      if (existingFather && !existingFather.spouseId){
+        existingFather.spouseId = id;
+        np.spouseId = forPerson.fatherId;
+      }
     } else if (rel === "spouse"){
       forPerson.spouseId = id;
       np.spouseId = forId;
@@ -1030,6 +1128,9 @@
         np.fatherId = forId;
         if (forPerson.spouseId) np.motherId = forPerson.spouseId;
       }
+    } else if (rel === "sibling"){
+      np.fatherId = forPerson.fatherId || null;
+      np.motherId = forPerson.motherId || null;
     }
     state.people[id] = np;
   }
