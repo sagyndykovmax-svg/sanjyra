@@ -7,11 +7,10 @@
 // can write. This is intentionally not a login system, just a
 // possession-based secret, same spirit as the URL-only sharing the rest
 // of the app already uses.
-import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
 import { randomBytes } from "node:crypto";
+import { redis } from "./_redis.js";
 
-const redis = Redis.fromEnv();
 const createLimit = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(20, "1 m"),

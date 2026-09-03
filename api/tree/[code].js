@@ -1,10 +1,9 @@
 // GET  /api/tree/:code — read-only fetch, anyone with the code can call this.
 // PUT  /api/tree/:code — update; requires {state, editToken} and the token
 //                        must match what POST /api/tree returned at creation.
-import { Redis } from "@upstash/redis";
 import { Ratelimit } from "@upstash/ratelimit";
+import { redis } from "../_redis.js";
 
-const redis = Redis.fromEnv();
 const readLimit = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(120, "1 m"),
