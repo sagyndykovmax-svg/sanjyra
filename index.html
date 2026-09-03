@@ -392,6 +392,7 @@
     <div class="topbar-actions">
       <button class="btn btn-ghost" id="btnExample" title="Посмотреть пример дерева"><span>📖</span><span class="lbl">Пример</span></button>
       <button class="btn btn-ghost" id="btnFit" title="Показать всё дерево"><span>⤢</span><span class="lbl">Показать всё</span></button>
+      <button class="btn btn-ghost" id="btnShorten" title="Получить короткую ссылку" style="display:none;">Короче</button>
       <button class="btn btn-ghost" id="btnQr" title="Показать QR-код ссылки">QR</button>
       <button class="btn btn-primary" id="btnShare"><span>🔗</span><span class="lbl">Скопировать ссылку</span></button>
     </div>
@@ -448,6 +449,10 @@
 <div class="share-pop" id="sharePop">
   <p>Скопируйте ссылку вручную и отправьте родственникам:</p>
   <input id="shareInput" type="text" readonly onclick="this.select()">
+  <div id="viewLinkRow" style="display:none; margin-top:10px;">
+    <p>Только для просмотра, без права правки:</p>
+    <input id="viewLinkInput" type="text" readonly onclick="this.select()">
+  </div>
 </div>
 
 <div class="example-overlay" id="exampleOverlay">
@@ -525,6 +530,9 @@
     sheetBackdrop: document.getElementById("sheetBackdrop"),
     sheet: document.getElementById("sheet"),
     sheetContent: document.getElementById("sheetContent"),
+    addRootBtn: document.getElementById("addRootBtn"),
+    btnAddFirst: document.getElementById("btnAddFirst"),
+    btnShorten: document.getElementById("btnShorten"),
     toast: document.getElementById("toast"),
     sharePop: document.getElementById("sharePop"),
     shareInput: document.getElementById("shareInput"),
@@ -557,6 +565,93 @@
 
   var state = null;
   var loadedFromLink = false;
+
+  /* ---- server-backed short links (optional) ----
+     Works only where /api/tree is actually served (the Vercel deployment
+     of this repo) — on GitHub Pages, or offline, every fetch below just
+     fails and the code falls straight back to the self-contained hash
+     link, so this whole layer is additive, never a hard dependency.
+
+     A tree stored server-side is addressed by two different secrets:
+     - CODE (in the URL path, /t/<code>) — the read key. Anyone who has
+       it can view the tree.
+     - EDIT_TOKEN (a query param the first time, then remembered in this
+       browser's localStorage) — the write key. Only a link that includes
+       ?edit=<token> grants editing; a bare /t/<code> link is view-only.
+     Sharing the code alone is how you hand the tree to people who should
+     only look; sharing it with ?edit=... is how you invite a co-editor. */
+
+  var API_BASE = "/api/tree";
+  var EDIT_TOKEN_PREFIX = "sanjyra-edit-";
+  var SERVER_CODE = null;
+  var EDIT_TOKEN = null;
+  var CAN_EDIT = true;
+
+  function serverViewUrl(){
+    return location.origin + "/t/" + SERVER_CODE;
+  }
+  function serverEditUrl(){
+    return location.origin + "/t/" + SERVER_CODE + "?edit=" + EDIT_TOKEN;
+  }
+
+  function parseServerPath(){
+    var m = location.pathname.match(/^\/t\/([A-Za-z0-9]{4,32})\/?$/);
+    return m ? m[1] : null;
+  }
+
+  function loadServerState(code){
+    SERVER_CODE = code;
+    var tokenFromUrl = null;
+    try{ tokenFromUrl = new URLSearchParams(location.search).get("edit"); }catch(e){}
+    var storedToken = null;
+    try{ storedToken = localStorage.getItem(EDIT_TOKEN_PREFIX + code); }catch(e){}
+    EDIT_TOKEN = tokenFromUrl || storedToken || null;
+    if (tokenFromUrl){
+      try{ localStorage.setItem(EDIT_TOKEN_PREFIX + code, tokenFromUrl); }catch(e){}
+      try{ history.replaceState(null, "", location.pathname); }catch(e){} // don't leave the token sitting in the visible URL
+    }
+    CAN_EDIT = !!EDIT_TOKEN;
+
+    return fetch(API_BASE + "/" + code)
+      .then(function(r){ if (!r.ok) throw new Error("fetch_failed"); return r.json(); })
+      .then(function(data){
+        loadedFromLink = true;
+        return data.state;
+      })
+      .catch(function(){
+        // Unknown/deleted code, or the API isn't reachable — don't leave
+        // the visitor stuck on a dead link, drop back to a fresh local tree.
+        SERVER_CODE = null;
+        CAN_EDIT = true;
+        return loadCachedOrDefault();
+      });
+  }
+
+  function createServerTree(){
+    return fetch(API_BASE, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({state: state})
+    })
+      .then(function(r){ if (!r.ok) throw new Error("create_failed"); return r.json(); })
+      .then(function(data){
+        SERVER_CODE = data.code;
+        EDIT_TOKEN = data.editToken;
+        CAN_EDIT = true;
+        try{ localStorage.setItem(EDIT_TOKEN_PREFIX + data.code, data.editToken); }catch(e){}
+        try{ history.replaceState(null, "", "/t/" + data.code); }catch(e){}
+        return true;
+      })
+      .catch(function(){ return false; });
+  }
+
+  function putServerState(){
+    return fetch(API_BASE + "/" + SERVER_CODE, {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({state: state, editToken: EDIT_TOKEN})
+    }).catch(function(){ /* offline / hiccup — the local copy in localStorage is still safe */ });
+  }
 
   /* ---- link encoding ----
      Native browser gzip (CompressionStream) packs this JSON noticeably
@@ -628,6 +723,9 @@
   }
 
   function loadState(){
+    var serverCode = parseServerPath();
+    if (serverCode) return loadServerState(serverCode);
+
     var hash = location.hash ? location.hash.slice(1) : "";
     if (!hash) return Promise.resolve(loadCachedOrDefault());
     return decodeState(hash).then(function(parsed){
@@ -641,6 +739,12 @@
 
   function saveState(){
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+
+    if (SERVER_CODE){
+      if (!CAN_EDIT) return Promise.resolve(); // view-only visitors never write
+      return putServerState();
+    }
+
     return encodeState(state).then(function(encoded){
       try{ history.replaceState(null, "", "#" + encoded); }catch(e){}
     });
@@ -784,6 +888,10 @@
 
   function render(){
     els.treeTitle.value = state.title;
+    els.treeTitle.readOnly = !CAN_EDIT;
+    els.addRootBtn.style.display = CAN_EDIT ? "flex" : "none";
+    els.btnAddFirst.style.display = CAN_EDIT ? "" : "none";
+    els.btnShorten.style.display = (!SERVER_CODE && CAN_EDIT && personCount() > 0 && !state.isExample) ? "" : "none";
     var count = personCount();
     els.exampleBanner.style.display = state.isExample ? "flex" : "none";
 
@@ -1034,7 +1142,11 @@
   function openSheet(mode){
     sheetMode = mode;
     els.sheetContent.innerHTML = buildSheetHtml(mode);
-    bindSheetEvents(mode);
+    if (mode.type === "view"){
+      document.getElementById("cancelBtn").addEventListener("click", closeSheet);
+    } else {
+      bindSheetEvents(mode);
+    }
     els.sheetBackdrop.classList.add("open");
     els.sheet.classList.add("open");
     var nameInput = els.sheetContent.querySelector('input[name="name"]');
@@ -1047,7 +1159,23 @@
     sheetMode = null;
   }
 
+  function buildViewSheetHtml(mode){
+    var p = state.people[mode.id];
+    var years = "";
+    if (p.birth || p.death) years = (p.birth||"?") + "–" + (p.death||"…");
+    var genderLabel = p.gender === "m" ? "Мужчина" : (p.gender === "f" ? "Женщина" : "Не указано");
+    var html = '<h3>' + escapeHtml(p.name || "Без имени") + '</h3>';
+    if (p.photo) html += '<div class="avatar-picker"><img class="avatar-preview filled" src="' + escapeAttr(p.photo) + '"></div>';
+    html += '<div class="field"><label>Пол</label><p class="subnote" style="margin:0;">' + genderLabel + '</p></div>';
+    if (years) html += '<div class="field"><label>Годы</label><p class="subnote" style="margin:0;">' + escapeHtml(years) + '</p></div>';
+    if (p.note) html += '<div class="field"><label>Заметка</label><p class="subnote" style="margin:0;">' + escapeHtml(p.note) + '</p></div>';
+    html += '<p class="subnote">Ссылка только для просмотра — добавлять и редактировать может только тот, у кого ссылка с правом правки.</p>';
+    html += '<div class="sheet-actions"><button class="btn btn-primary" id="cancelBtn" style="flex:1;">Закрыть</button></div>';
+    return html;
+  }
+
   function buildSheetHtml(mode){
+    if (mode.type === "view") return buildViewSheetHtml(mode);
     var title, person, defaults = {name:"", gender:"u", birth:"", death:"", note:"", photo:""};
     if (mode.type === "edit"){
       person = state.people[mode.id];
@@ -1340,6 +1468,8 @@
       };
       if (!data.name){ form.name.focus(); return; }
 
+      var wasEmpty = personCount() === 0;
+
       if (mode.type === "edit"){
         var p = state.people[mode.id];
         p.name = data.name; p.gender = data.gender; p.birth = data.birth; p.death = data.death; p.note = data.note; p.photo = data.photo;
@@ -1350,10 +1480,22 @@
         state.people[id] = Object.assign({id:id, fatherId:null, motherId:null, spouseId:null}, data);
       }
       state.isExample = false;
-      saveState();
       render();
       closeSheet();
       showToast("Сохранено");
+
+      // First person ever, typed fresh (not opened from an existing link)
+      // → this is a brand-new tree, so try to give it a short server link
+      // right away instead of the long self-contained one. Silently falls
+      // back to the usual local link if /api/tree isn't reachable (e.g.
+      // GitHub Pages).
+      if (wasEmpty && !SERVER_CODE && !loadedFromLink){
+        createServerTree().then(function(ok){
+          if (ok) render(); else saveState();
+        });
+      } else {
+        saveState();
+      }
     });
 
     var delBtn = document.getElementById("deleteBtn");
@@ -1467,14 +1609,14 @@
   els.nodes.addEventListener("click", function(e){
     var card = e.target.closest(".card");
     if (!card) return;
-    openSheet({type:"edit", id: card.getAttribute("data-id")});
+    openSheet({type: CAN_EDIT ? "edit" : "view", id: card.getAttribute("data-id")});
   });
   els.nodes.addEventListener("keydown", function(e){
     if (e.key !== "Enter" && e.key !== " ") return;
     var card = e.target.closest(".card");
     if (!card) return;
     e.preventDefault();
-    openSheet({type:"edit", id: card.getAttribute("data-id")});
+    openSheet({type: CAN_EDIT ? "edit" : "view", id: card.getAttribute("data-id")});
   });
 
   document.getElementById("btnAddFirst").addEventListener("click", function(){ openSheet({type:"add-root"}); });
@@ -1495,12 +1637,22 @@
     saveState();
   });
 
+  // In server mode the URL bar deliberately never carries the edit token
+  // (it's stripped right after first use, see loadServerState), so share
+  // actions must rebuild the edit link explicitly rather than reading
+  // location.href — otherwise "copy link" would hand out a view-only link
+  // by accident.
+  function primaryShareUrl(){
+    if (SERVER_CODE) return CAN_EDIT ? serverEditUrl() : serverViewUrl();
+    return location.href;
+  }
+
   document.getElementById("btnQr").addEventListener("click", function(){
     saveState().then(function(){
       var holder = document.getElementById("qrHolder");
       try{
         var qr = qrcode(0, "L"); // typeNumber 0 = smallest version that fits; L = max data capacity
-        qr.addData(location.href);
+        qr.addData(primaryShareUrl());
         qr.make();
         holder.innerHTML = qr.createSvgTag({scalable: true});
       }catch(e){
@@ -1515,14 +1667,33 @@
     document.getElementById("qrOverlay").classList.remove("open");
   });
 
+  document.getElementById("btnShorten").addEventListener("click", function(){
+    createServerTree().then(function(ok){
+      if (ok){
+        render();
+        showToast("Готово — теперь у вас короткая ссылка");
+      } else {
+        showToast("Короткие ссылки работают только на сайте с сервером — на этом адресе недоступно");
+      }
+    });
+  });
+
   document.getElementById("btnShare").addEventListener("click", function(){
     saveState().then(function(){
-    var url = location.href;
+    var url = primaryShareUrl();
     els.shareInput.value = url;
+    var viewRow = document.getElementById("viewLinkRow");
+    if (SERVER_CODE && CAN_EDIT){
+      document.getElementById("viewLinkInput").value = serverViewUrl();
+      viewRow.style.display = "block";
+    } else {
+      viewRow.style.display = "none";
+    }
     if (navigator.clipboard && navigator.clipboard.writeText){
       navigator.clipboard.writeText(url).then(function(){
         showToast("Ссылка скопирована — отправьте родственникам");
-        els.sharePop.classList.remove("open");
+        if (viewRow.style.display === "none") els.sharePop.classList.remove("open");
+        else openSharePop(); // still show the popover so the view-only link is reachable
       }).catch(openSharePop);
     } else {
       openSharePop();

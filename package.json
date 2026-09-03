@@ -1,0 +1,10 @@
+{
+  "name": "sanjyra",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Родовое древо (санжыра) — статическая страница + маленький API на Vercel для коротких ссылок",
+  "dependencies": {
+    "@upstash/redis": "^1.34.3",
+    "@upstash/ratelimit": "^2.0.5"
+  }
+}
