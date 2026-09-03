@@ -269,6 +269,23 @@
     width:100%; font-size:12.5px; padding:8px 10px; border-radius:8px; border:1px solid var(--line-strong);
     background:var(--surface); color:var(--ink); font-family:var(--font-body);
   }
+  .example-overlay{
+    position:fixed; inset:0; z-index:60; background:var(--bg); display:none; flex-direction:column;
+  }
+  .example-overlay.open{display:flex;}
+  .example-overlay-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:12px 16px; background:var(--surface-2); border-bottom:1px solid var(--line);
+  }
+  .example-overlay-bar strong{font-family:var(--font-display); font-weight:400; font-size:15px; color:var(--ink);}
+  .example-overlay-bar p{margin:1px 0 0; font-size:11.5px; color:var(--ink-muted);}
+  #previewWrap{
+    flex:1; position:relative; overflow:hidden;
+    background-color:var(--bg);
+    background-image:radial-gradient(var(--bg-dot) 1.4px, transparent 1.4px);
+    background-size:26px 26px;
+  }
+  #previewCanvas{position:absolute; left:0; top:0; transform-origin:0 0;}
 
   .toast{
     position:fixed; left:50%; bottom:26px; transform:translate(-50%,12px); z-index:50;
@@ -306,6 +323,7 @@
       </div>
     </div>
     <div class="topbar-actions">
+      <button class="btn btn-ghost" id="btnExample" title="Посмотреть пример дерева"><span>📖</span><span class="lbl">Пример</span></button>
       <button class="btn btn-ghost" id="btnFit" title="Показать всё дерево"><span>⤢</span><span class="lbl">Показать всё</span></button>
       <button class="btn btn-primary" id="btnShare"><span>🔗</span><span class="lbl">Скопировать ссылку</span></button>
     </div>
@@ -360,6 +378,22 @@
 <div class="share-pop" id="sharePop">
   <p>Скопируйте ссылку вручную и отправьте родственникам:</p>
   <input id="shareInput" type="text" readonly onclick="this.select()">
+</div>
+
+<div class="example-overlay" id="exampleOverlay">
+  <div class="example-overlay-bar">
+    <div>
+      <strong>Пример: санжыра рода Байтемира</strong>
+      <p>Только для просмотра — ваше дерево не меняется</p>
+    </div>
+    <button class="btn btn-primary" id="closeExampleOverlay">✕ Закрыть пример</button>
+  </div>
+  <div id="previewWrap">
+    <div id="previewCanvas">
+      <svg class="lines" id="previewLines"></svg>
+      <div class="nodes" id="previewNodes"></div>
+    </div>
+  </div>
 </div>
 
 <div class="confirm" id="confirmBox">
@@ -480,11 +514,9 @@
   function computeLayout(){
     var people = state.people;
     var ids = Object.keys(people);
-    var spousePartners = {};
-    ids.forEach(function(id){
-      var p = people[id];
-      if (p.spouseId && people[p.spouseId]) spousePartners[id] = true;
-    });
+    function hasParent(p){
+      return !!((p.fatherId && people[p.fatherId]) || (p.motherId && people[p.motherId]));
+    }
 
     var childrenOf = {};
     ids.forEach(function(id){
@@ -496,10 +528,22 @@
       }
     });
 
+    // A person is a root (top of their own branch) unless someone else already
+    // carries them into the tree: either a recorded parent, or — for a couple
+    // with no parents on either side — their spouse, chosen as the single
+    // representative so the pair isn't counted (and excluded) twice.
     var roots = ids.filter(function(id){
       var p = people[id];
-      var hasParent = (p.fatherId && people[p.fatherId]) || (p.motherId && people[p.motherId]);
-      return !hasParent && !spousePartners[id];
+      if (hasParent(p)) return false;
+      if (p.spouseId && people[p.spouseId]){
+        var partner = people[p.spouseId];
+        if (hasParent(partner)) return false;
+        var meMale = p.gender === "m", partnerMale = partner.gender === "m";
+        if (meMale && !partnerMale) return true;
+        if (!meMale && partnerMale) return false;
+        return id < p.spouseId;
+      }
+      return true;
     });
 
     // assign generations via BFS
@@ -528,13 +572,16 @@
     function shiftSubtree(id, dx){
       people[id].slot += dx;
       var sp = people[id].spouseId;
-      if (sp && people[sp] && spousePartners[sp]) people[sp].slot += dx;
+      if (sp && people[sp]) people[sp].slot += dx;
       (childrenOf[id] || []).forEach(function(cid){ shiftSubtree(cid, dx); });
     }
 
+    var COUPLE_OFFSET = 0.93; // slot units between spouse card centers — keeps a visible gap, no overlap
+    var COUPLE_MIN_WIDTH = 1.9;
+
     function layout(id){
       var kids = childrenOf[id] || [];
-      var minW = (people[id].spouseId && people[people[id].spouseId]) ? 1.6 : 1;
+      var minW = (people[id].spouseId && people[people[id].spouseId]) ? COUPLE_MIN_WIDTH : 1;
       var startX = cursor;
       if (kids.length === 0){
         people[id].slot = cursor + minW/2;
@@ -552,8 +599,8 @@
       }
       var spId = people[id].spouseId;
       if (spId && people[spId]){
-        people[id].slot -= 0.3;
-        people[spId].slot = people[id].slot + 0.6;
+        people[id].slot -= COUPLE_OFFSET/2;
+        people[spId].slot = people[id].slot + COUPLE_OFFSET;
       }
     }
 
@@ -588,14 +635,10 @@
   function render(){
     els.treeTitle.value = state.title;
     var count = personCount();
-    var gens = 0;
-    Object.keys(state.people).forEach(function(id){
-      gens = Math.max(gens, (state.people[id].generation || 0) + 1);
-    });
-    els.stats.textContent = count + (count === 1 ? " человек" : (count>=2&&count<=4 ? " человека" : " человек")) + " · " + gens + (gens===1?" поколение":(gens>=2&&gens<=4?" поколения":" поколений"));
     els.exampleBanner.style.display = state.isExample ? "flex" : "none";
 
     if (count === 0){
+      els.stats.textContent = "0 человек · 0 поколений";
       els.emptyState.classList.add("show");
       els.nodes.innerHTML = "";
       els.lines.innerHTML = "";
@@ -607,6 +650,8 @@
     var layoutInfo = computeLayout();
     var people = state.people;
     var ids = Object.keys(people);
+    var gens = layoutInfo.maxGen + 1;
+    els.stats.textContent = count + (count === 1 ? " человек" : (count>=2&&count<=4 ? " человека" : " человек")) + " · " + gens + (gens===1?" поколение":(gens>=2&&gens<=4?" поколения":" поколений"));
 
     var canvasW = px(layoutInfo.maxSlot) + PAD_X * 2;
     var canvasH = py(layoutInfo.maxGen) + CARD_H + 100;
@@ -725,7 +770,7 @@
   var pinchState = null;
 
   els.canvasWrap.addEventListener("pointerdown", function(e){
-    if (e.target.closest(".card")) return;
+    if (e.target.closest(".card, button, input, textarea, a")) return;
     pointers[e.pointerId] = {x:e.clientX, y:e.clientY};
     var ids = Object.keys(pointers);
     if (ids.length === 1){
@@ -795,6 +840,39 @@
     zoomAround(r.width/2, r.height/2, 0.8);
   });
   document.getElementById("btnFit").addEventListener("click", fitToScreen);
+
+  // Shows the demo tree in a full-screen read-only overlay instead of a new
+  // tab/window: window.open() and target="_blank" are unreliable in popup
+  // blockers and, more importantly here, inside chat-app in-browser viewers
+  // (WhatsApp, Telegram) that relatives will actually open this link from.
+  document.getElementById("btnExample").addEventListener("click", function(){
+    var savedState = state;
+    var savedCanvas = els.canvas, savedLines = els.lines, savedNodes = els.nodes;
+
+    state = exampleState();
+    els.canvas = document.getElementById("previewCanvas");
+    els.lines = document.getElementById("previewLines");
+    els.nodes = document.getElementById("previewNodes");
+    render();
+
+    // Show the overlay BEFORE measuring: previewWrap has no layout box (0x0)
+    // while its ancestor is display:none, which would make the fit below
+    // divide by (effectively) nothing.
+    document.getElementById("exampleOverlay").classList.add("open");
+
+    var wrap = document.getElementById("previewWrap");
+    var cw = parseFloat(els.canvas.style.width) || wrap.clientWidth;
+    var ch = parseFloat(els.canvas.style.height) || wrap.clientHeight;
+    var s = Math.max(0.3, Math.min((wrap.clientWidth - 40) / cw, (wrap.clientHeight - 40) / ch, 1.05));
+    els.canvas.style.transform = "translate(" + ((wrap.clientWidth - cw * s) / 2) + "px,20px) scale(" + s + ")";
+
+    state = savedState;
+    els.canvas = savedCanvas; els.lines = savedLines; els.nodes = savedNodes;
+    render(); // undo the header/title/stats side-effects render() made while state was swapped
+  });
+  document.getElementById("closeExampleOverlay").addEventListener("click", function(){
+    document.getElementById("exampleOverlay").classList.remove("open");
+  });
 
   /* ---------------- sheet / forms ---------------- */
 
