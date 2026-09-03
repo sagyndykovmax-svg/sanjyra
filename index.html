@@ -528,20 +528,65 @@
   var state = null;
   var loadedFromLink = false;
 
-  function loadState(){
-    var hash = location.hash ? location.hash.slice(1) : "";
-    if (hash && window.LZString){
+  /* ---- link encoding ----
+     Native browser gzip (CompressionStream) packs this JSON noticeably
+     tighter than LZString for our kind of data (repeated field names, IDs,
+     base64 photo bytes) — worth it since the whole tree travels inside the
+     URL. New saves use "d:"+base64url(deflate bytes) when the browser
+     supports it. Links already shared before this used plain LZString
+     output with no prefix — decoding always tries "d:" first, then falls
+     back to LZString, so old links keep working. */
+
+  function bytesToBase64Url(bytes){
+    var binary = "";
+    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function base64UrlToBytes(str){
+    str = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (str.length % 4) str += "=";
+    var binary = atob(str);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  function encodeState(stateObj){
+    var json = JSON.stringify(stateObj);
+    if (window.CompressionStream){
+      var stream = new Blob([json]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+      return new Response(stream).arrayBuffer()
+        .then(function(buf){ return "d:" + bytesToBase64Url(new Uint8Array(buf)); })
+        .catch(function(){ return legacyEncode(json); });
+    }
+    return Promise.resolve(legacyEncode(json));
+  }
+  function legacyEncode(json){
+    if (window.LZString){
+      try{ return LZString.compressToEncodedURIComponent(json); }catch(e){}
+    }
+    return encodeURIComponent(json);
+  }
+
+  function decodeState(hash){
+    if (hash.indexOf("d:") === 0 && window.DecompressionStream){
+      var bytes = base64UrlToBytes(hash.slice(2));
+      var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      return new Response(stream).arrayBuffer()
+        .then(function(buf){ return JSON.parse(new TextDecoder().decode(buf)); })
+        .catch(function(){ return null; });
+    }
+    if (window.LZString){
       try{
         var json = LZString.decompressFromEncodedURIComponent(hash);
-        if (json){
-          var parsed = JSON.parse(json);
-          if (parsed && parsed.people){
-            loadedFromLink = true;
-            return parsed;
-          }
-        }
-      }catch(e){ /* ignore malformed hash */ }
+        if (json) return Promise.resolve(JSON.parse(json));
+      }catch(e){}
     }
+    try{ return Promise.resolve(JSON.parse(decodeURIComponent(hash))); }catch(e){}
+    return Promise.resolve(null);
+  }
+
+  function loadCachedOrDefault(){
     try{
       var cached = localStorage.getItem(STORAGE_KEY);
       if (cached){
@@ -552,14 +597,23 @@
     return exampleState();
   }
 
-  function saveState(pushHash){
+  function loadState(){
+    var hash = location.hash ? location.hash.slice(1) : "";
+    if (!hash) return Promise.resolve(loadCachedOrDefault());
+    return decodeState(hash).then(function(parsed){
+      if (parsed && parsed.people){
+        loadedFromLink = true;
+        return parsed;
+      }
+      return loadCachedOrDefault();
+    });
+  }
+
+  function saveState(){
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
-    if (window.LZString){
-      try{
-        var compressed = LZString.compressToEncodedURIComponent(JSON.stringify(state));
-        history.replaceState(null, "", "#" + compressed);
-      }catch(e){}
-    }
+    return encodeState(state).then(function(encoded){
+      try{ history.replaceState(null, "", "#" + encoded); }catch(e){}
+    });
   }
 
   /* ---------------- helpers ---------------- */
@@ -1033,7 +1087,7 @@
   // high-entropy), so the real lever is keeping the source thumbnail small
   // — hence the low pixel size and a quality ladder that backs off further
   // for busy/high-detail photos that don't compress well.
-  var AVATAR_PX = 56;
+  var AVATAR_PX = 44;
   var AVATAR_MAX_CHARS = 9000; // ~6.5 KB decoded per photo
   var CROP_VP = 240; // must match .crop-viewport width/height in CSS
 
@@ -1412,7 +1466,7 @@
   });
 
   document.getElementById("btnShare").addEventListener("click", function(){
-    saveState();
+    saveState().then(function(){
     var url = location.href;
     els.shareInput.value = url;
     if (navigator.clipboard && navigator.clipboard.writeText){
@@ -1423,6 +1477,7 @@
     } else {
       openSharePop();
     }
+    });
   });
 
   function openSharePop(){
@@ -1442,10 +1497,12 @@
 
   /* ---------------- init ---------------- */
 
-  state = loadState();
-  render();
-  setTimeout(fitToScreen, 30);
-  if (loadedFromLink) setTimeout(function(){ showToast("Дерево загружено по ссылке"); }, 400);
+  loadState().then(function(s){
+    state = s;
+    render();
+    setTimeout(fitToScreen, 30);
+    if (loadedFromLink) setTimeout(function(){ showToast("Дерево загружено по ссылке"); }, 400);
+  });
 
   window.addEventListener("resize", function(){ /* keep current view; user can hit "fit" */ });
 })();
