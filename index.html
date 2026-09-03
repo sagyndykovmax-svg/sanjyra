@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Санжыра Сагындыковых</title>
+<meta name="description" content="Родовое древо, которое родственники дополняют по ссылке — без регистрации, прямо в браузере.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yeseva+One&family=Manrope:wght@400;500;600;700;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0; padding:0; height:100%;}
+  :root{
+    --bg:#EDE7D8;
+    --bg-dot:#E2DAC5;
+    --surface:#F8F4E9;
+    --surface-2:#FBF8F0;
+    --ink:#232A3B;
+    --ink-muted:#726A59;
+    --ink-faint:#9A917C;
+    --accent:#C6402A;
+    --accent-ink:#FBF3E9;
+    --gold:#AD8025;
+    --male:#2E4A6B;
+    --female:#A6394A;
+    --line:rgba(35,42,59,0.15);
+    --line-strong:rgba(35,42,59,0.28);
+    --shadow:0 10px 30px -14px rgba(35,26,14,0.35);
+    --radius:14px;
+    --font-display:'Yeseva One', Georgia, 'Times New Roman', serif;
+    --font-body:'Manrope', 'Segoe UI', system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1A1E29;
+      --bg-dot:#212636;
+      --surface:#242B3D;
+      --surface-2:#2B3347;
+      --ink:#ECE6D6;
+      --ink-muted:#A79E8C;
+      --ink-faint:#7C7462;
+      --accent:#E1583C;
+      --accent-ink:#1A1218;
+      --gold:#D8AE55;
+      --male:#7FA0C9;
+      --female:#DE8C99;
+      --line:rgba(236,230,214,0.14);
+      --line-strong:rgba(236,230,214,0.26);
+      --shadow:0 10px 34px -14px rgba(0,0,0,0.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1A1E29;
+    --bg-dot:#212636;
+    --surface:#242B3D;
+    --surface-2:#2B3347;
+    --ink:#ECE6D6;
+    --ink-muted:#A79E8C;
+    --ink-faint:#7C7462;
+    --accent:#E1583C;
+    --accent-ink:#1A1218;
+    --gold:#D8AE55;
+    --male:#7FA0C9;
+    --female:#DE8C99;
+    --line:rgba(236,230,214,0.14);
+    --line-strong:rgba(236,230,214,0.26);
+    --shadow:0 10px 34px -14px rgba(0,0,0,0.55);
+  }
+
+  body{background:var(--bg); color:var(--ink); font-family:var(--font-body);}
+  button{font-family:inherit;}
+  ::selection{background:var(--accent); color:var(--accent-ink);}
+
+  .app{position:relative; width:100%; height:100vh; min-height:560px; display:flex; flex-direction:column; overflow:hidden;}
+
+  /* ---------- header ---------- */
+  .topbar{
+    position:relative; z-index:20;
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:14px 20px; background:var(--surface-2);
+    border-bottom:1px solid var(--line);
+  }
+  .topbar::after{
+    content:""; position:absolute; left:0; right:0; bottom:-6px; height:6px;
+    background-image:repeating-linear-gradient(115deg, var(--gold) 0 3px, transparent 3px 12px);
+    opacity:.55; pointer-events:none;
+  }
+  .brand{display:flex; align-items:center; gap:12px; min-width:0;}
+  .brand-glyph{flex:none; width:38px; height:38px;}
+  .brand-text{min-width:0;}
+  .tree-title{
+    font-family:var(--font-display); font-size:19px; line-height:1.15; color:var(--ink);
+    background:transparent; border:1px solid transparent; border-radius:8px;
+    padding:2px 6px; margin-left:-6px; max-width:52vw;
+  }
+  .tree-title:hover, .tree-title:focus{border-color:var(--line); outline:none; background:var(--surface);}
+  .tree-stats{font-size:12px; color:var(--ink-muted); margin-top:2px; letter-spacing:.01em; font-variant-numeric:tabular-nums;}
+  .topbar-actions{display:flex; align-items:center; gap:8px; flex:none;}
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+    font-size:13.5px; font-weight:600; padding:9px 14px; border-radius:999px;
+    border:1px solid var(--line-strong); background:var(--surface); color:var(--ink);
+    cursor:pointer; transition:transform .12s ease, background .15s ease;
+  }
+  .btn:hover{background:var(--bg-dot);}
+  .btn:active{transform:scale(.96);}
+  .btn-primary{background:var(--accent); color:var(--accent-ink); border-color:transparent;}
+  .btn-primary:hover{filter:brightness(1.06); background:var(--accent);}
+  .btn-ghost{background:transparent; border-color:transparent;}
+  .btn-danger{color:var(--female); border-color:var(--female);}
+  .btn:focus-visible, input:focus-visible, textarea:focus-visible, .card:focus-visible{
+    outline:2px solid var(--accent); outline-offset:2px;
+  }
+
+  /* ---------- canvas ---------- */
+  .canvas-wrap{
+    position:relative; flex:1; overflow:hidden; touch-action:none; cursor:grab;
+    background-color:var(--bg);
+    background-image:radial-gradient(var(--bg-dot) 1.4px, transparent 1.4px);
+    background-size:26px 26px;
+  }
+  .canvas-wrap.panning{cursor:grabbing;}
+  .canvas{position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform;}
+  .lines{position:absolute; left:0; top:0; overflow:visible;}
+  .lines path{fill:none; stroke:var(--gold); stroke-width:1.6px; opacity:.85;}
+  .lines .tie{stroke:var(--line-strong); stroke-width:2px;}
+  .gen-label{
+    position:absolute; font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--ink-faint); font-weight:700; white-space:nowrap;
+  }
+
+  .nodes{position:absolute; left:0; top:0;}
+  .card{
+    position:absolute; width:176px; min-height:64px; padding:9px 12px;
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    box-shadow:0 3px 10px -6px rgba(20,15,5,0.35);
+    cursor:pointer; user-select:none;
+    display:flex; flex-direction:column; justify-content:center; gap:2px;
+  }
+  .card:hover{border-color:var(--gold);}
+  .card .row1{display:flex; align-items:center; gap:7px;}
+  .card .glyph{flex:none; width:9px; height:9px;}
+  .card .glyph.male{background:var(--male); transform:rotate(45deg); border-radius:2px;}
+  .card .glyph.female{background:var(--female); border-radius:50%;}
+  .card .glyph.unk{border:1.6px solid var(--ink-faint); border-radius:50%;}
+  .card .name{font-size:14px; font-weight:700; line-height:1.2; overflow-wrap:anywhere;}
+  .card .years{font-size:11.5px; color:var(--ink-muted); font-variant-numeric:tabular-nums; margin-left:16px;}
+  .card .note{font-size:11px; color:var(--ink-faint); margin-left:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+  .fab{
+    position:absolute; right:20px; bottom:22px; z-index:15;
+    width:54px; height:54px; border-radius:50%; border:none;
+    background:var(--accent); color:var(--accent-ink); font-size:26px; line-height:1;
+    box-shadow:var(--shadow); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .fab:active{transform:scale(.94);}
+
+  .zoom-controls{
+    position:absolute; left:16px; bottom:22px; z-index:15; display:flex; flex-direction:column;
+    border-radius:12px; overflow:hidden; box-shadow:var(--shadow); border:1px solid var(--line);
+  }
+  .zoom-controls button{
+    width:38px; height:38px; border:none; background:var(--surface); color:var(--ink);
+    font-size:18px; cursor:pointer; border-bottom:1px solid var(--line);
+  }
+  .zoom-controls button:last-child{border-bottom:none;}
+  .zoom-controls button:hover{background:var(--bg-dot);}
+
+  .legend{
+    position:absolute; left:16px; top:14px; z-index:15;
+    display:flex; gap:12px; padding:7px 12px; border-radius:999px;
+    background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow);
+    font-size:11.5px; color:var(--ink-muted);
+  }
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .legend i{width:8px; height:8px; display:inline-block;}
+  .legend i.male{background:var(--male); transform:rotate(45deg); border-radius:2px;}
+  .legend i.female{background:var(--female); border-radius:50%;}
+  .legend i.unk{border:1.5px solid var(--ink-faint); border-radius:50%;}
+
+  /* ---------- example banner ---------- */
+  .example-banner{
+    position:absolute; left:50%; top:14px; transform:translateX(-50%); z-index:16;
+    max-width:min(92vw,520px); display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:var(--surface); border:1px solid var(--gold); border-radius:999px;
+    padding:8px 8px 8px 16px; box-shadow:var(--shadow); font-size:12.5px; color:var(--ink-muted);
+  }
+  .example-banner strong{color:var(--ink); font-weight:700;}
+  .example-banner button{
+    font-size:12px; font-weight:700; padding:7px 12px; border-radius:999px; border:none;
+    background:var(--accent); color:var(--accent-ink); cursor:pointer;
+  }
+
+  /* ---------- empty state ---------- */
+  .empty-state{
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    text-align:center; padding:24px; z-index:12; pointer-events:none;
+  }
+  .empty-state.show{display:flex;}
+  .empty-inner{max-width:380px; pointer-events:auto;}
+  .empty-motif{width:88px; height:88px; margin:0 auto 18px;}
+  .empty-inner h2{font-family:var(--font-display); font-size:24px; margin:0 0 10px; text-wrap:balance;}
+  .empty-inner p{font-size:13.5px; line-height:1.55; color:var(--ink-muted); margin:0 0 20px;}
+
+  /* ---------- sheet ---------- */
+  .sheet-backdrop{
+    position:fixed; inset:0; background:rgba(20,16,10,0.42); opacity:0; pointer-events:none;
+    transition:opacity .18s ease; z-index:30;
+  }
+  .sheet-backdrop.open{opacity:1; pointer-events:auto;}
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:31; max-height:86vh; overflow-y:auto;
+    background:var(--surface-2); border-radius:18px 18px 0 0; box-shadow:0 -12px 40px -10px rgba(0,0,0,0.4);
+    padding:10px 20px 28px; transform:translateY(102%); transition:transform .22s cubic-bezier(.32,.72,0,1);
+    margin:0 auto; width:100%; max-width:520px;
+  }
+  .sheet.open{transform:translateY(0);}
+  .sheet-handle{width:38px; height:4px; background:var(--line-strong); border-radius:99px; margin:6px auto 14px;}
+  .sheet h3{font-family:var(--font-display); font-size:19px; margin:0 0 14px; font-weight:400;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted); margin-bottom:6px;}
+  .field input[type=text], .field textarea{
+    width:100%; font-family:inherit; font-size:15px; color:var(--ink); background:var(--surface);
+    border:1px solid var(--line-strong); border-radius:10px; padding:10px 12px; resize:vertical;
+  }
+  .field input:focus, .field textarea:focus{outline:none; border-color:var(--accent);}
+  .pillrow{display:flex; gap:8px; flex-wrap:wrap;}
+  .pill{
+    padding:8px 14px; border-radius:999px; border:1px solid var(--line-strong); background:var(--surface);
+    font-size:13px; font-weight:600; cursor:pointer; color:var(--ink-muted);
+  }
+  .pill.active{background:var(--ink); color:var(--surface); border-color:var(--ink);}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .sheet-actions{display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;}
+  .sheet-actions .btn{flex:1; justify-content:center; padding:12px 14px;}
+  .relations{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:16px 0;}
+  .relations button{
+    font-size:12.5px; font-weight:600; padding:10px; border-radius:10px; border:1px dashed var(--line-strong);
+    background:transparent; color:var(--ink-muted); cursor:pointer; text-align:left;
+  }
+  .relations button:hover{border-color:var(--gold); color:var(--ink);}
+  .divider{height:1px; background:var(--line); margin:16px 0;}
+  .subnote{font-size:12px; color:var(--ink-faint); margin-top:-6px; margin-bottom:14px;}
+
+  /* ---------- mini confirm ---------- */
+  .confirm{
+    position:fixed; inset:0; z-index:40; display:none; align-items:center; justify-content:center; padding:20px;
+    background:rgba(20,16,10,0.42);
+  }
+  .confirm.open{display:flex;}
+  .confirm-box{
+    max-width:340px; background:var(--surface-2); border-radius:16px; padding:20px; box-shadow:var(--shadow);
+    text-align:center;
+  }
+  .confirm-box p{font-size:14px; line-height:1.5; margin:0 0 16px;}
+  .confirm-box .row{display:flex; gap:10px;}
+  .confirm-box .btn{flex:1; justify-content:center;}
+
+  /* ---------- share popover ---------- */
+  .share-pop{
+    position:fixed; z-index:35; right:20px; top:64px; max-width:min(92vw,360px);
+    background:var(--surface-2); border:1px solid var(--line); border-radius:14px; padding:14px;
+    box-shadow:var(--shadow); display:none;
+  }
+  .share-pop.open{display:block;}
+  .share-pop p{font-size:12.5px; color:var(--ink-muted); margin:0 0 8px;}
+  .share-pop input{
+    width:100%; font-size:12.5px; padding:8px 10px; border-radius:8px; border:1px solid var(--line-strong);
+    background:var(--surface); color:var(--ink); font-family:var(--font-body);
+  }
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translate(-50%,12px); z-index:50;
+    background:var(--ink); color:var(--bg); font-size:13px; font-weight:600; padding:11px 18px;
+    border-radius:999px; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease;
+    box-shadow:var(--shadow);
+  }
+  .toast.show{opacity:1; transform:translate(-50%,0);}
+
+  @media (max-width:560px){
+    .topbar{padding:12px 14px;}
+    .tree-title{font-size:16px; max-width:44vw;}
+    .btn span.lbl{display:none;}
+    .example-banner{font-size:11.5px; padding:7px 7px 7px 12px;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition-duration:0.001ms !important; animation-duration:0.001ms !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-glyph" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="18" fill="none" stroke="var(--gold)" stroke-width="1.4" opacity=".55"/>
+        <circle cx="20" cy="20" r="12.5" fill="none" stroke="var(--gold)" stroke-width="1.4" opacity=".8"/>
+        <circle cx="20" cy="20" r="4.5" fill="var(--accent)"/>
+        <path d="M20 1.5 V38.5 M1.5 20 H38.5" stroke="var(--gold)" stroke-width="1.2" opacity=".45"/>
+      </svg>
+      <div class="brand-text">
+        <input id="treeTitle" class="tree-title" value="Санжыра" />
+        <div class="tree-stats" id="stats">0 человек · 0 поколений</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost" id="btnFit" title="Показать всё дерево"><span>⤢</span><span class="lbl">Показать всё</span></button>
+      <button class="btn btn-primary" id="btnShare"><span>🔗</span><span class="lbl">Скопировать ссылку</span></button>
+    </div>
+  </header>
+
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="legend" id="legend">
+      <span><i class="male"></i>муж.</span>
+      <span><i class="female"></i>жен.</span>
+      <span><i class="unk"></i>—</span>
+    </div>
+
+    <div class="example-banner" id="exampleBanner" style="display:none;">
+      <span>Это <strong>пример</strong> — покажите родным, как это выглядит.</span>
+      <button id="btnStartOwn">Начать свою санжыру</button>
+    </div>
+
+    <div class="canvas" id="canvas">
+      <svg class="lines" id="lines"></svg>
+      <div class="nodes" id="nodes"></div>
+    </div>
+
+    <div class="empty-state" id="emptyState">
+      <div class="empty-inner">
+        <svg class="empty-motif" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="var(--gold)" stroke-width="1.6" opacity=".5"/>
+          <circle cx="50" cy="50" r="32" fill="none" stroke="var(--gold)" stroke-width="1.6" opacity=".7"/>
+          <circle cx="50" cy="50" r="10" fill="var(--accent)"/>
+          <path d="M50 4 V96 M4 50 H96" stroke="var(--gold)" stroke-width="1.2" opacity=".4"/>
+        </svg>
+        <h2>Начните с самого старшего предка</h2>
+        <p>По кыргызской традиции принято знать предков до седьмого колена — «жети ата». Добавьте самого старшего известного родственника, а дальше от него достраивайте детей, супругов и внуков.</p>
+        <button class="btn btn-primary" id="btnAddFirst" style="padding:12px 20px;">Добавить первого человека</button>
+      </div>
+    </div>
+
+    <div class="zoom-controls">
+      <button id="zoomIn" aria-label="Увеличить">+</button>
+      <button id="zoomOut" aria-label="Уменьшить">−</button>
+    </div>
+
+    <button class="fab" id="addRootBtn" title="Добавить нового предка / другую ветвь">+</button>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div id="sheetContent"></div>
+</div>
+
+<div class="share-pop" id="sharePop">
+  <p>Скопируйте ссылку вручную и отправьте родственникам:</p>
+  <input id="shareInput" type="text" readonly onclick="this.select()">
+</div>
+
+<div class="confirm" id="confirmBox">
+  <div class="confirm-box">
+    <p id="confirmText"></p>
+    <div class="row">
+      <button class="btn" id="confirmNo">Отмена</button>
+      <button class="btn btn-danger" id="confirmYes">Да, удалить</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var CARD_W = 176, CARD_H = 64, COL_GAP = 30, ROW_H = 150, PAD_X = 60, PAD_TOP = 70;
+  var UNIT = CARD_W + COL_GAP;
+
+  var STORAGE_KEY = "sanjyra-state-v1";
+
+  var els = {
+    treeTitle: document.getElementById("treeTitle"),
+    stats: document.getElementById("stats"),
+    canvasWrap: document.getElementById("canvasWrap"),
+    canvas: document.getElementById("canvas"),
+    lines: document.getElementById("lines"),
+    nodes: document.getElementById("nodes"),
+    emptyState: document.getElementById("emptyState"),
+    exampleBanner: document.getElementById("exampleBanner"),
+    sheetBackdrop: document.getElementById("sheetBackdrop"),
+    sheet: document.getElementById("sheet"),
+    sheetContent: document.getElementById("sheetContent"),
+    toast: document.getElementById("toast"),
+    sharePop: document.getElementById("sharePop"),
+    shareInput: document.getElementById("shareInput"),
+    confirmBox: document.getElementById("confirmBox"),
+    confirmText: document.getElementById("confirmText"),
+    confirmYes: document.getElementById("confirmYes"),
+    confirmNo: document.getElementById("confirmNo")
+  };
+
+  /* ---------------- state ---------------- */
+
+  function exampleState(){
+    return {
+      title: "Пример: Санжыра рода Байтемира",
+      isExample: true,
+      people: {
+        p1: {id:"p1", name:"Байтемир уулу Асан", gender:"m", birth:"1930", death:"2005", note:"аил Таш-Дөбө", fatherId:null, motherId:null, spouseId:"p2"},
+        p2: {id:"p2", name:"Гүлсүн эже", gender:"f", birth:"1935", death:"2011", note:"", fatherId:null, motherId:null, spouseId:"p1"},
+        p3: {id:"p3", name:"Нурлан Асанович", gender:"m", birth:"1958", death:"", note:"инженер", fatherId:"p1", motherId:"p2", spouseId:"p4"},
+        p4: {id:"p4", name:"Айгүл Нурлановна", gender:"f", birth:"1962", death:"", note:"", fatherId:null, motherId:null, spouseId:"p3"},
+        p5: {id:"p5", name:"Жамал Асановна", gender:"f", birth:"1960", death:"", note:"", fatherId:"p1", motherId:"p2", spouseId:null},
+        p6: {id:"p6", name:"Динара Нурлановна", gender:"f", birth:"1985", death:"", note:"Бишкек", fatherId:"p3", motherId:"p4", spouseId:null}
+      }
+    };
+  }
+
+  function emptyRealState(){
+    return { title: "Санжыра рода Сагындыковых", isExample:false, people:{} };
+  }
+
+  var state = null;
+  var loadedFromLink = false;
+
+  function loadState(){
+    var hash = location.hash ? location.hash.slice(1) : "";
+    if (hash && window.LZString){
+      try{
+        var json = LZString.decompressFromEncodedURIComponent(hash);
+        if (json){
+          var parsed = JSON.parse(json);
+          if (parsed && parsed.people){
+            loadedFromLink = true;
+            return parsed;
+          }
+        }
+      }catch(e){ /* ignore malformed hash */ }
+    }
+    try{
+      var cached = localStorage.getItem(STORAGE_KEY);
+      if (cached){
+        var parsedCache = JSON.parse(cached);
+        if (parsedCache && parsedCache.people) return parsedCache;
+      }
+    }catch(e){}
+    return exampleState();
+  }
+
+  function saveState(pushHash){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+    if (window.LZString){
+      try{
+        var compressed = LZString.compressToEncodedURIComponent(JSON.stringify(state));
+        history.replaceState(null, "", "#" + compressed);
+      }catch(e){}
+    }
+  }
+
+  /* ---------------- helpers ---------------- */
+
+  function uid(){ return "p" + Math.random().toString(36).slice(2,9); }
+
+  function personCount(){ return Object.keys(state.people).length; }
+
+  function genderDefault(rel, forPerson){
+    if (rel === "father") return "m";
+    if (rel === "mother") return "f";
+    if (rel === "spouse") return forPerson.gender === "m" ? "f" : (forPerson.gender === "f" ? "m" : "u");
+    return "u";
+  }
+
+  /* ---------------- layout ---------------- */
+
+  function computeLayout(){
+    var people = state.people;
+    var ids = Object.keys(people);
+    var spousePartners = {};
+    ids.forEach(function(id){
+      var p = people[id];
+      if (p.spouseId && people[p.spouseId]) spousePartners[id] = true;
+    });
+
+    var childrenOf = {};
+    ids.forEach(function(id){
+      var p = people[id];
+      var owner = p.fatherId && people[p.fatherId] ? p.fatherId : (p.motherId && people[p.motherId] ? p.motherId : null);
+      if (owner){
+        if (!childrenOf[owner]) childrenOf[owner] = [];
+        childrenOf[owner].push(id);
+      }
+    });
+
+    var roots = ids.filter(function(id){
+      var p = people[id];
+      var hasParent = (p.fatherId && people[p.fatherId]) || (p.motherId && people[p.motherId]);
+      return !hasParent && !spousePartners[id];
+    });
+
+    // assign generations via BFS
+    var visited = {};
+    var queue = roots.map(function(id){ return {id:id, gen:0}; });
+    var maxGen = 0;
+    while(queue.length){
+      var item = queue.shift();
+      if (visited[item.id]) continue;
+      visited[item.id] = true;
+      people[item.id].generation = item.gen;
+      maxGen = Math.max(maxGen, item.gen);
+      var sp = people[item.id].spouseId;
+      if (sp && people[sp] && !visited[sp]){
+        visited[sp] = true;
+        people[sp].generation = item.gen;
+      }
+      (childrenOf[item.id] || []).forEach(function(cid){
+        queue.push({id:cid, gen:item.gen+1});
+      });
+    }
+
+    // slot layout (postorder DFS with shifting)
+    var cursor = 0;
+
+    function shiftSubtree(id, dx){
+      people[id].slot += dx;
+      var sp = people[id].spouseId;
+      if (sp && people[sp] && spousePartners[sp]) people[sp].slot += dx;
+      (childrenOf[id] || []).forEach(function(cid){ shiftSubtree(cid, dx); });
+    }
+
+    function layout(id){
+      var kids = childrenOf[id] || [];
+      var minW = (people[id].spouseId && people[people[id].spouseId]) ? 1.6 : 1;
+      var startX = cursor;
+      if (kids.length === 0){
+        people[id].slot = cursor + minW/2;
+        cursor += minW;
+      } else {
+        kids.forEach(function(cid){ layout(cid); });
+        var w = cursor - startX;
+        if (w < minW){
+          var diff = minW - w;
+          kids.forEach(function(cid){ shiftSubtree(cid, diff/2); });
+          cursor += diff;
+          w = minW;
+        }
+        people[id].slot = startX + w/2;
+      }
+      var spId = people[id].spouseId;
+      if (spId && people[spId]){
+        people[id].slot -= 0.3;
+        people[spId].slot = people[id].slot + 0.6;
+      }
+    }
+
+    roots.forEach(function(id){
+      layout(id);
+      cursor += 0.9;
+    });
+
+    // orphan safety: anyone not visited (broken refs) — place as extra roots
+    ids.forEach(function(id){
+      if (!visited[id]){
+        people[id].generation = 0;
+        people[id].slot = cursor + 0.5;
+        cursor += 1;
+        visited[id] = true;
+      }
+    });
+
+    var maxSlot = 0;
+    ids.forEach(function(id){ maxSlot = Math.max(maxSlot, people[id].slot || 0); });
+
+    return { maxGen: maxGen, maxSlot: maxSlot, childrenOf: childrenOf };
+  }
+
+  /* ---------------- render ---------------- */
+
+  var view = { x: 40, y: 30, scale: 0.85 };
+
+  function px(slot){ return slot * UNIT; }
+  function py(gen){ return gen * ROW_H + PAD_TOP; }
+
+  function render(){
+    els.treeTitle.value = state.title;
+    var count = personCount();
+    var gens = 0;
+    Object.keys(state.people).forEach(function(id){
+      gens = Math.max(gens, (state.people[id].generation || 0) + 1);
+    });
+    els.stats.textContent = count + (count === 1 ? " человек" : (count>=2&&count<=4 ? " человека" : " человек")) + " · " + gens + (gens===1?" поколение":(gens>=2&&gens<=4?" поколения":" поколений"));
+    els.exampleBanner.style.display = state.isExample ? "flex" : "none";
+
+    if (count === 0){
+      els.emptyState.classList.add("show");
+      els.nodes.innerHTML = "";
+      els.lines.innerHTML = "";
+      applyTransform();
+      return;
+    }
+    els.emptyState.classList.remove("show");
+
+    var layoutInfo = computeLayout();
+    var people = state.people;
+    var ids = Object.keys(people);
+
+    var canvasW = px(layoutInfo.maxSlot) + PAD_X * 2;
+    var canvasH = py(layoutInfo.maxGen) + CARD_H + 100;
+    els.canvas.style.width = canvasW + "px";
+    els.canvas.style.height = canvasH + "px";
+    els.lines.setAttribute("width", canvasW);
+    els.lines.setAttribute("height", canvasH);
+    els.lines.setAttribute("viewBox", "0 0 " + canvasW + " " + canvasH);
+
+    var nodesHtml = "";
+    var genSeen = {};
+    ids.forEach(function(id){
+      var p = people[id];
+      var x = px(p.slot) + PAD_X - CARD_W/2;
+      var y = py(p.generation);
+      var glyphClass = p.gender === "m" ? "male" : (p.gender === "f" ? "female" : "unk");
+      var years = "";
+      if (p.birth || p.death) years = (p.birth||"?") + "–" + (p.death||"…");
+      nodesHtml += '<div class="card" tabindex="0" data-id="' + id + '" style="left:' + x + 'px; top:' + y + 'px;">' +
+        '<div class="row1"><span class="glyph ' + glyphClass + '"></span><span class="name">' + escapeHtml(p.name || "Без имени") + '</span></div>' +
+        (years ? '<div class="years">' + escapeHtml(years) + '</div>' : '') +
+        (p.note ? '<div class="note">' + escapeHtml(p.note) + '</div>' : '') +
+        '</div>';
+      if (!genSeen[p.generation]) genSeen[p.generation] = true;
+    });
+    els.nodes.innerHTML = nodesHtml;
+
+    var linesSvg = "";
+    Object.keys(genSeen).sort(function(a,b){return a-b;}).forEach(function(g, idx){
+      linesSvg += '<text class="gen-label-svg" x="' + (PAD_X - 46) + '" y="' + (py(g) + CARD_H/2 + 4) + '" fill="var(--ink-faint)" font-size="11" font-weight="700" letter-spacing="1">ПОКОЛ. ' + (parseInt(g,10)+1) + '</text>';
+    });
+
+    // spouse ties + parent-child connectors
+    var drawnTie = {};
+    ids.forEach(function(id){
+      var p = people[id];
+      var x = px(p.slot) + PAD_X;
+      var y = py(p.generation);
+      if (p.spouseId && people[p.spouseId] && !drawnTie[id] && !drawnTie[p.spouseId]){
+        var sp = people[p.spouseId];
+        var x2 = px(sp.slot) + PAD_X;
+        var midY = y + CARD_H/2;
+        linesSvg += '<path class="tie" d="M ' + Math.min(x,x2) + ' ' + midY + ' L ' + Math.max(x,x2) + ' ' + midY + '"/>';
+        drawnTie[id] = true; drawnTie[p.spouseId] = true;
+      }
+    });
+
+    Object.keys(layoutInfo.childrenOf).forEach(function(parentId){
+      var parent = people[parentId];
+      var kids = layoutInfo.childrenOf[parentId];
+      if (!kids.length) return;
+      var parentX = px(parent.slot) + PAD_X;
+      if (parent.spouseId && people[parent.spouseId]){
+        parentX = (px(parent.slot) + px(people[parent.spouseId].slot)) / 2 + PAD_X;
+      }
+      var parentY = py(parent.generation) + CARD_H;
+      var childGen = people[kids[0]].generation;
+      var busY = parentY + (py(childGen) - parentY) * 0.5;
+
+      linesSvg += '<path d="M ' + parentX + ' ' + parentY + ' L ' + parentX + ' ' + busY + '"/>';
+      var childXs = kids.map(function(cid){ return px(people[cid].slot) + PAD_X; });
+      var minX = Math.min.apply(null, childXs.concat([parentX]));
+      var maxX = Math.max.apply(null, childXs.concat([parentX]));
+      linesSvg += '<path d="M ' + minX + ' ' + busY + ' L ' + maxX + ' ' + busY + '"/>';
+      kids.forEach(function(cid){
+        var cx = px(people[cid].slot) + PAD_X;
+        var cy = py(people[cid].generation);
+        linesSvg += '<path d="M ' + cx + ' ' + busY + ' L ' + cx + ' ' + cy + '"/>';
+      });
+    });
+
+    els.lines.innerHTML = linesSvg;
+    applyTransform();
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  /* ---------------- pan & zoom ---------------- */
+
+  function applyTransform(){
+    els.canvas.style.transform = "translate(" + view.x + "px," + view.y + "px) scale(" + view.scale + ")";
+  }
+
+  function clampScale(s){ return Math.max(0.28, Math.min(2.2, s)); }
+
+  function zoomAround(cx, cy, factor){
+    var newScale = clampScale(view.scale * factor);
+    var wx = (cx - view.x) / view.scale;
+    var wy = (cy - view.y) / view.scale;
+    view.scale = newScale;
+    view.x = cx - wx * view.scale;
+    view.y = cy - wy * view.scale;
+    applyTransform();
+  }
+
+  function fitToScreen(){
+    var count = personCount();
+    if (!count) { view = {x:40,y:30,scale:0.85}; applyTransform(); return; }
+    var wrapRect = els.canvasWrap.getBoundingClientRect();
+    var cw = parseFloat(els.canvas.style.width) || wrapRect.width;
+    var ch = parseFloat(els.canvas.style.height) || wrapRect.height;
+    var s = Math.min((wrapRect.width - 40) / cw, (wrapRect.height - 40) / ch, 1.1);
+    s = clampScale(s);
+    view.scale = s;
+    view.x = (wrapRect.width - cw * s) / 2;
+    view.y = 24;
+    applyTransform();
+  }
+
+  var pointers = {};
+  var panState = null;
+  var pinchState = null;
+
+  els.canvasWrap.addEventListener("pointerdown", function(e){
+    if (e.target.closest(".card")) return;
+    pointers[e.pointerId] = {x:e.clientX, y:e.clientY};
+    var ids = Object.keys(pointers);
+    if (ids.length === 1){
+      panState = { startX:e.clientX, startY:e.clientY, ox:view.x, oy:view.y };
+      els.canvasWrap.classList.add("panning");
+      els.canvasWrap.setPointerCapture(e.pointerId);
+    } else if (ids.length === 2){
+      panState = null;
+      var p1 = pointers[ids[0]], p2 = pointers[ids[1]];
+      pinchState = {
+        startDist: Math.hypot(p2.x-p1.x, p2.y-p1.y),
+        startScale: view.scale,
+        midX:(p1.x+p2.x)/2, midY:(p1.y+p2.y)/2
+      };
+    }
+  });
+
+  els.canvasWrap.addEventListener("pointermove", function(e){
+    if (!pointers[e.pointerId]) return;
+    pointers[e.pointerId] = {x:e.clientX, y:e.clientY};
+    var ids = Object.keys(pointers);
+    if (ids.length === 2 && pinchState){
+      var p1 = pointers[ids[0]], p2 = pointers[ids[1]];
+      var dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+      var rect = els.canvasWrap.getBoundingClientRect();
+      var factor = dist / (pinchState.startDist || 1);
+      var newScale = clampScale(pinchState.startScale * factor);
+      var mx = pinchState.midX - rect.left, my = pinchState.midY - rect.top;
+      var wx = (mx - view.x) / view.scale, wy = (my - view.y) / view.scale;
+      view.scale = newScale;
+      view.x = mx - wx * view.scale;
+      view.y = my - wy * view.scale;
+      applyTransform();
+    } else if (panState && ids.length === 1){
+      view.x = panState.ox + (e.clientX - panState.startX);
+      view.y = panState.oy + (e.clientY - panState.startY);
+      applyTransform();
+    }
+  });
+
+  function endPointer(e){
+    delete pointers[e.pointerId];
+    var ids = Object.keys(pointers);
+    if (ids.length < 2) pinchState = null;
+    if (ids.length === 0){ panState = null; els.canvasWrap.classList.remove("panning"); }
+    else if (ids.length === 1){
+      var only = pointers[ids[0]];
+      panState = { startX:only.x, startY:only.y, ox:view.x, oy:view.y };
+    }
+  }
+  els.canvasWrap.addEventListener("pointerup", endPointer);
+  els.canvasWrap.addEventListener("pointercancel", endPointer);
+
+  els.canvasWrap.addEventListener("wheel", function(e){
+    e.preventDefault();
+    var rect = els.canvasWrap.getBoundingClientRect();
+    var factor = e.deltaY < 0 ? 1.1 : 0.9;
+    zoomAround(e.clientX - rect.left, e.clientY - rect.top, factor);
+  }, {passive:false});
+
+  document.getElementById("zoomIn").addEventListener("click", function(){
+    var r = els.canvasWrap.getBoundingClientRect();
+    zoomAround(r.width/2, r.height/2, 1.2);
+  });
+  document.getElementById("zoomOut").addEventListener("click", function(){
+    var r = els.canvasWrap.getBoundingClientRect();
+    zoomAround(r.width/2, r.height/2, 0.8);
+  });
+  document.getElementById("btnFit").addEventListener("click", fitToScreen);
+
+  /* ---------------- sheet / forms ---------------- */
+
+  var sheetMode = null; // {type:'add-root'} | {type:'edit', id} | {type:'add-relative', rel, forId}
+
+  function openSheet(mode){
+    sheetMode = mode;
+    els.sheetContent.innerHTML = buildSheetHtml(mode);
+    bindSheetEvents(mode);
+    els.sheetBackdrop.classList.add("open");
+    els.sheet.classList.add("open");
+    var nameInput = els.sheetContent.querySelector('input[name="name"]');
+    if (nameInput) setTimeout(function(){ nameInput.focus(); }, 260);
+  }
+
+  function closeSheet(){
+    els.sheetBackdrop.classList.remove("open");
+    els.sheet.classList.remove("open");
+    sheetMode = null;
+  }
+
+  function buildSheetHtml(mode){
+    var title, person, defaults = {name:"", gender:"u", birth:"", death:"", note:""};
+    if (mode.type === "edit"){
+      person = state.people[mode.id];
+      title = "Карточка человека";
+      defaults = person;
+    } else if (mode.type === "add-relative"){
+      var relLabels = {father:"Добавить отца", mother:"Добавить мать", spouse:"Добавить супруга / супругу", child:"Добавить ребёнка"};
+      title = relLabels[mode.rel] || "Добавить родственника";
+      defaults.gender = genderDefault(mode.rel, state.people[mode.forId]);
+    } else {
+      title = "Новый человек";
+    }
+
+    var html = '<h3>' + title + '</h3>';
+    html += '<form id="personForm">';
+    html += '<div class="field"><label>Имя и фамилия</label><input type="text" name="name" value="' + escapeAttr(defaults.name||"") + '" placeholder="Например, Асан уулу Бекболот" required></div>';
+    html += '<div class="field"><label>Пол</label><div class="pillrow" id="genderPills">' +
+      pillBtn("m","Мужчина",defaults.gender) + pillBtn("f","Женщина",defaults.gender) + pillBtn("u","Не указано",defaults.gender) +
+      '</div><input type="hidden" name="gender" value="' + (defaults.gender||"u") + '"></div>';
+    html += '<div class="two-col">' +
+      '<div class="field"><label>Год рождения</label><input type="text" inputmode="numeric" name="birth" value="' + escapeAttr(defaults.birth||"") + '" placeholder="напр. 1958"></div>' +
+      '<div class="field"><label>Год смерти</label><input type="text" inputmode="numeric" name="death" value="' + escapeAttr(defaults.death||"") + '" placeholder="если жив(а) — пусто"></div>' +
+      '</div>';
+    html += '<div class="field"><label>Заметка (необязательно)</label><textarea name="note" rows="2" placeholder="род занятий, аил, интересный факт">' + escapeHtml(defaults.note||"") + '</textarea></div>';
+    html += '</form>';
+
+    if (mode.type === "edit"){
+      var rels = "";
+      if (!person.fatherId) rels += '<button data-rel="father">+ Отец</button>';
+      if (!person.motherId) rels += '<button data-rel="mother">+ Мать</button>';
+      if (!person.spouseId) rels += '<button data-rel="spouse">+ Супруг(а)</button>';
+      rels += '<button data-rel="child">+ Ребёнок</button>';
+      html += '<div class="divider"></div><div class="relations" id="relBtns">' + rels + '</div>';
+      html += '<div class="sheet-actions">' +
+        '<button class="btn btn-primary" id="saveBtn">Сохранить</button>' +
+        '<button class="btn btn-danger" id="deleteBtn">Удалить</button>' +
+        '</div>';
+      html += '<div class="sheet-actions" style="margin-top:6px;"><button class="btn btn-ghost" id="cancelBtn" style="flex:1;">Закрыть</button></div>';
+    } else {
+      html += '<div class="sheet-actions">' +
+        '<button class="btn btn-primary" id="saveBtn">Добавить</button>' +
+        '<button class="btn btn-ghost" id="cancelBtn">Отмена</button>' +
+        '</div>';
+    }
+    return html;
+  }
+
+  function pillBtn(val,label,current){
+    return '<button type="button" class="pill' + (current===val?' active':'') + '" data-val="' + val + '">' + label + '</button>';
+  }
+  function escapeAttr(s){ return escapeHtml(s).replace(/"/g,"&quot;"); }
+
+  function bindSheetEvents(mode){
+    var form = document.getElementById("personForm");
+    var genderHidden = form.querySelector('input[name="gender"]');
+    var pills = document.getElementById("genderPills");
+    pills.addEventListener("click", function(e){
+      var btn = e.target.closest(".pill");
+      if (!btn) return;
+      pills.querySelectorAll(".pill").forEach(function(p){ p.classList.remove("active"); });
+      btn.classList.add("active");
+      genderHidden.value = btn.getAttribute("data-val");
+    });
+
+    var relBtns = document.getElementById("relBtns");
+    if (relBtns){
+      relBtns.addEventListener("click", function(e){
+        var btn = e.target.closest("button[data-rel]");
+        if (!btn) return;
+        openSheet({type:"add-relative", rel:btn.getAttribute("data-rel"), forId:mode.id});
+      });
+    }
+
+    document.getElementById("cancelBtn").addEventListener("click", closeSheet);
+
+    document.getElementById("saveBtn").addEventListener("click", function(){
+      var data = {
+        name: form.name.value.trim(),
+        gender: genderHidden.value,
+        birth: form.birth.value.trim(),
+        death: form.death.value.trim(),
+        note: form.note.value.trim()
+      };
+      if (!data.name){ form.name.focus(); return; }
+
+      if (mode.type === "edit"){
+        var p = state.people[mode.id];
+        p.name = data.name; p.gender = data.gender; p.birth = data.birth; p.death = data.death; p.note = data.note;
+      } else if (mode.type === "add-relative"){
+        addRelative(mode.rel, mode.forId, data);
+      } else {
+        var id = uid();
+        state.people[id] = Object.assign({id:id, fatherId:null, motherId:null, spouseId:null}, data);
+      }
+      state.isExample = false;
+      saveState();
+      render();
+      closeSheet();
+      showToast("Сохранено");
+    });
+
+    var delBtn = document.getElementById("deleteBtn");
+    if (delBtn){
+      delBtn.addEventListener("click", function(){
+        askConfirm("Удалить «" + (state.people[mode.id].name || "этого человека") + "»? Связи с детьми и супругом будут разорваны, но сами дети останутся в дереве.", function(){
+          deletePerson(mode.id);
+          saveState();
+          render();
+          closeSheet();
+          showToast("Удалено");
+        });
+      });
+    }
+  }
+
+  function addRelative(rel, forId, data){
+    var forPerson = state.people[forId];
+    var id = uid();
+    var np = Object.assign({id:id, fatherId:null, motherId:null, spouseId:null}, data);
+
+    if (rel === "father"){
+      forPerson.fatherId = id;
+    } else if (rel === "mother"){
+      forPerson.motherId = id;
+    } else if (rel === "spouse"){
+      forPerson.spouseId = id;
+      np.spouseId = forId;
+    } else if (rel === "child"){
+      if (forPerson.gender === "f"){
+        np.motherId = forId;
+        if (forPerson.spouseId) np.fatherId = forPerson.spouseId;
+      } else {
+        np.fatherId = forId;
+        if (forPerson.spouseId) np.motherId = forPerson.spouseId;
+      }
+    }
+    state.people[id] = np;
+  }
+
+  function deletePerson(id){
+    var p = state.people[id];
+    if (!p) return;
+    Object.keys(state.people).forEach(function(otherId){
+      var o = state.people[otherId];
+      if (o.fatherId === id) o.fatherId = null;
+      if (o.motherId === id) o.motherId = null;
+      if (o.spouseId === id) o.spouseId = null;
+    });
+    delete state.people[id];
+  }
+
+  /* ---------------- confirm dialog ---------------- */
+
+  var confirmCb = null;
+  function askConfirm(text, cb){
+    els.confirmText.textContent = text;
+    confirmCb = cb;
+    els.confirmBox.classList.add("open");
+  }
+  els.confirmYes.addEventListener("click", function(){
+    els.confirmBox.classList.remove("open");
+    if (confirmCb) confirmCb();
+    confirmCb = null;
+  });
+  els.confirmNo.addEventListener("click", function(){
+    els.confirmBox.classList.remove("open");
+    confirmCb = null;
+  });
+
+  /* ---------------- toast ---------------- */
+
+  var toastTimer = null;
+  function showToast(msg){
+    els.toast.textContent = msg;
+    els.toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ els.toast.classList.remove("show"); }, 2200);
+  }
+
+  /* ---------------- wire up top-level controls ---------------- */
+
+  els.nodes.addEventListener("click", function(e){
+    var card = e.target.closest(".card");
+    if (!card) return;
+    openSheet({type:"edit", id: card.getAttribute("data-id")});
+  });
+  els.nodes.addEventListener("keydown", function(e){
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var card = e.target.closest(".card");
+    if (!card) return;
+    e.preventDefault();
+    openSheet({type:"edit", id: card.getAttribute("data-id")});
+  });
+
+  document.getElementById("btnAddFirst").addEventListener("click", function(){ openSheet({type:"add-root"}); });
+  document.getElementById("addRootBtn").addEventListener("click", function(){ openSheet({type:"add-root"}); });
+  els.sheetBackdrop.addEventListener("click", closeSheet);
+
+  document.getElementById("btnStartOwn").addEventListener("click", function(){
+    askConfirm("Очистить пример и начать заполнять свою санжыру?", function(){
+      state = emptyRealState();
+      saveState();
+      render();
+      fitToScreen();
+    });
+  });
+
+  els.treeTitle.addEventListener("change", function(){
+    state.title = els.treeTitle.value.trim() || "Санжыра";
+    saveState();
+  });
+
+  document.getElementById("btnShare").addEventListener("click", function(){
+    saveState();
+    var url = location.href;
+    els.shareInput.value = url;
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(function(){
+        showToast("Ссылка скопирована — отправьте родственникам");
+        els.sharePop.classList.remove("open");
+      }).catch(openSharePop);
+    } else {
+      openSharePop();
+    }
+  });
+
+  function openSharePop(){
+    els.sharePop.classList.add("open");
+    els.shareInput.focus();
+    els.shareInput.select();
+    setTimeout(function(){
+      document.addEventListener("click", closeSharePopOnce);
+    }, 0);
+  }
+  function closeSharePopOnce(e){
+    if (!els.sharePop.contains(e.target) && e.target.id !== "btnShare"){
+      els.sharePop.classList.remove("open");
+      document.removeEventListener("click", closeSharePopOnce);
+    }
+  }
+
+  /* ---------------- init ---------------- */
+
+  state = loadState();
+  render();
+  setTimeout(fitToScreen, 30);
+  if (loadedFromLink) setTimeout(function(){ showToast("Дерево загружено по ссылке"); }, 400);
+
+  window.addEventListener("resize", function(){ /* keep current view; user can hit "fit" */ });
+})();
+</script>
+
+</body>
+</html>
