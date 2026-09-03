@@ -164,6 +164,32 @@
   .avatar-picker-actions{display:flex; flex-direction:column; gap:6px;}
   .avatar-picker-actions .btn{padding:7px 12px; font-size:12.5px;}
 
+  /* ---------- photo crop overlay ---------- */
+  .crop-overlay{
+    position:fixed; inset:0; z-index:70; background:var(--surface-2); display:none;
+    flex-direction:column; align-items:center; padding:24px 20px; overflow-y:auto;
+  }
+  .crop-overlay.open{display:flex;}
+  .crop-overlay h3{font-family:var(--font-display); font-weight:400; font-size:18px; margin:0 0 4px; text-align:center;}
+  .crop-overlay p{font-size:12.5px; color:var(--ink-muted); margin:0 0 20px; text-align:center;}
+  .crop-viewport{
+    width:240px; height:240px; border-radius:50%; overflow:hidden; position:relative;
+    touch-action:none; cursor:grab; flex:none;
+    box-shadow:0 0 0 9999px rgba(10,8,4,0.72);
+  }
+  .crop-viewport:active{cursor:grabbing;}
+  .crop-viewport img{
+    position:absolute; left:0; top:0; transform-origin:0 0; max-width:none; user-select:none; -webkit-user-drag:none;
+  }
+  .crop-zoom{display:flex; align-items:center; gap:10px; width:100%; max-width:320px; margin:28px 0 0;}
+  .crop-zoom input[type=range]{flex:1; accent-color:var(--accent);}
+  .crop-zoom button{
+    flex:none; width:34px; height:34px; border-radius:50%; border:1px solid var(--line-strong);
+    background:var(--surface); color:var(--ink); font-size:17px; cursor:pointer;
+  }
+  .crop-actions{display:flex; gap:10px; width:100%; max-width:320px; margin-top:22px;}
+  .crop-actions .btn{flex:1; justify-content:center; padding:12px 14px;}
+
   .fab{
     position:absolute; right:20px; bottom:22px; z-index:15;
     width:54px; height:54px; border-radius:50%; border:none;
@@ -416,6 +442,23 @@
       <svg class="lines" id="previewLines"></svg>
       <div class="nodes" id="previewNodes"></div>
     </div>
+  </div>
+</div>
+
+<div class="crop-overlay" id="cropOverlay">
+  <h3>Выберите область с лицом</h3>
+  <p>Потяните фото пальцем или мышью, зум — ползунком или колёсиком</p>
+  <div class="crop-viewport" id="cropViewport">
+    <img id="cropImg" alt="" draggable="false">
+  </div>
+  <div class="crop-zoom">
+    <button type="button" id="cropZoomOut" aria-label="Уменьшить">−</button>
+    <input type="range" id="cropZoomRange" min="0" max="100" value="0">
+    <button type="button" id="cropZoomIn" aria-label="Увеличить">+</button>
+  </div>
+  <div class="crop-actions">
+    <button type="button" class="btn btn-ghost" id="cropCancel">Отмена</button>
+    <button type="button" class="btn btn-primary" id="cropConfirm">Готово</button>
   </div>
 </div>
 
@@ -984,28 +1027,171 @@
 
   // Photos live inside the shareable link itself (there is no server), so
   // every photo is downscaled to a small square thumbnail and compressed
-  // hard before it's stored — otherwise a few full-size photos would blow
-  // the link up to megabytes and it would stop working as a link at all.
-  var AVATAR_PX = 128;
-  function resizePhotoFile(file, cb){
+  // hard before it's stored — otherwise a handful of photos would blow the
+  // link up to a size that's unusable to paste into a chat. Base64 image
+  // data barely compresses further with LZString (it's already
+  // high-entropy), so the real lever is keeping the source thumbnail small
+  // — hence the low pixel size and a quality ladder that backs off further
+  // for busy/high-detail photos that don't compress well.
+  var AVATAR_PX = 56;
+  var AVATAR_MAX_CHARS = 9000; // ~6.5 KB decoded per photo
+  var CROP_VP = 240; // must match .crop-viewport width/height in CSS
+
+  function cropToDataUrl(img, sx, sy, sSize){
+    var canvas = document.createElement("canvas");
+    canvas.width = AVATAR_PX; canvas.height = AVATAR_PX;
+    var ctx = canvas.getContext("2d");
+    ctx.drawImage(img, sx, sy, sSize, sSize, 0, 0, AVATAR_PX, AVATAR_PX);
+    var qualities = [0.55, 0.4, 0.25, 0.15];
+    var dataUrl = canvas.toDataURL("image/jpeg", qualities[0]);
+    for (var i = 1; i < qualities.length && dataUrl.length > AVATAR_MAX_CHARS; i++){
+      dataUrl = canvas.toDataURL("image/jpeg", qualities[i]);
+    }
+    return dataUrl;
+  }
+
+  // Lets you pan/zoom the source photo inside a circular window before it's
+  // downsized — a plain center-crop often cuts faces off in group photos or
+  // portrait shots, so this is how you pick exactly which part becomes the
+  // avatar.
+  var cropState = null; // {img, scale, minScale, maxScale, x, y}
+  var cropCallback = null;
+  var cropEls = {
+    overlay: document.getElementById("cropOverlay"),
+    viewport: document.getElementById("cropViewport"),
+    img: document.getElementById("cropImg"),
+    range: document.getElementById("cropZoomRange")
+  };
+
+  function clampCropPos(){
+    var w = cropState.img.naturalWidth * cropState.scale;
+    var h = cropState.img.naturalHeight * cropState.scale;
+    cropState.x = Math.min(0, Math.max(CROP_VP - w, cropState.x));
+    cropState.y = Math.min(0, Math.max(CROP_VP - h, cropState.y));
+  }
+  function applyCropTransform(){
+    cropEls.img.style.transform = "translate(" + cropState.x + "px," + cropState.y + "px) scale(" + cropState.scale + ")";
+  }
+  function setCropScale(newScale, anchorX, anchorY){
+    newScale = Math.max(cropState.minScale, Math.min(cropState.maxScale, newScale));
+    var wx = (anchorX - cropState.x) / cropState.scale;
+    var wy = (anchorY - cropState.y) / cropState.scale;
+    cropState.scale = newScale;
+    cropState.x = anchorX - wx * newScale;
+    cropState.y = anchorY - wy * newScale;
+    clampCropPos();
+    applyCropTransform();
+    var t = (cropState.scale - cropState.minScale) / (cropState.maxScale - cropState.minScale || 1);
+    cropEls.range.value = Math.round(t * 100);
+  }
+
+  function openCropper(file, onDone){
     var reader = new FileReader();
     reader.onload = function(){
       var img = new Image();
       img.onload = function(){
-        var side = Math.min(img.width, img.height);
-        var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
-        var canvas = document.createElement("canvas");
-        canvas.width = AVATAR_PX; canvas.height = AVATAR_PX;
-        var ctx = canvas.getContext("2d");
-        ctx.drawImage(img, sx, sy, side, side, 0, 0, AVATAR_PX, AVATAR_PX);
-        cb(canvas.toDataURL("image/jpeg", 0.6));
+        var minScale = CROP_VP / Math.min(img.naturalWidth, img.naturalHeight);
+        cropState = {
+          img: img,
+          scale: minScale,
+          minScale: minScale,
+          maxScale: minScale * 4,
+          x: (CROP_VP - img.naturalWidth * minScale) / 2,
+          y: (CROP_VP - img.naturalHeight * minScale) / 2
+        };
+        cropCallback = onDone;
+        cropEls.img.src = reader.result;
+        applyCropTransform();
+        cropEls.range.value = 0;
+        cropEls.overlay.classList.add("open");
       };
-      img.onerror = function(){ cb(null); };
+      img.onerror = function(){ showToast("Не удалось открыть это фото"); };
       img.src = reader.result;
     };
-    reader.onerror = function(){ cb(null); };
+    reader.onerror = function(){ showToast("Не удалось открыть это фото"); };
     reader.readAsDataURL(file);
   }
+  function closeCropper(){
+    cropEls.overlay.classList.remove("open");
+    cropState = null;
+    cropCallback = null;
+  }
+
+  cropEls.range.addEventListener("input", function(){
+    if (!cropState) return;
+    var t = cropEls.range.value / 100;
+    setCropScale(cropState.minScale + t * (cropState.maxScale - cropState.minScale), CROP_VP/2, CROP_VP/2);
+  });
+  document.getElementById("cropZoomIn").addEventListener("click", function(){
+    if (cropState) setCropScale(cropState.scale * 1.25, CROP_VP/2, CROP_VP/2);
+  });
+  document.getElementById("cropZoomOut").addEventListener("click", function(){
+    if (cropState) setCropScale(cropState.scale / 1.25, CROP_VP/2, CROP_VP/2);
+  });
+  document.getElementById("cropCancel").addEventListener("click", closeCropper);
+  document.getElementById("cropConfirm").addEventListener("click", function(){
+    if (!cropState) return;
+    var sSize = CROP_VP / cropState.scale;
+    var sx = -cropState.x / cropState.scale;
+    var sy = -cropState.y / cropState.scale;
+    var dataUrl = cropToDataUrl(cropState.img, sx, sy, sSize);
+    var cb = cropCallback;
+    closeCropper();
+    if (cb) cb(dataUrl);
+  });
+
+  var cropPointers = {};
+  var cropPanStart = null;
+  var cropPinch = null;
+  cropEls.viewport.addEventListener("pointerdown", function(e){
+    if (!cropState) return;
+    cropPointers[e.pointerId] = {x:e.clientX, y:e.clientY};
+    var ids = Object.keys(cropPointers);
+    if (ids.length === 1){
+      cropPanStart = {startX:e.clientX, startY:e.clientY, ox:cropState.x, oy:cropState.y};
+      cropEls.viewport.setPointerCapture(e.pointerId);
+    } else if (ids.length === 2){
+      cropPanStart = null;
+      var p1 = cropPointers[ids[0]], p2 = cropPointers[ids[1]];
+      cropPinch = { startDist: Math.hypot(p2.x-p1.x, p2.y-p1.y), startScale: cropState.scale, midX:(p1.x+p2.x)/2, midY:(p1.y+p2.y)/2 };
+    }
+  });
+  cropEls.viewport.addEventListener("pointermove", function(e){
+    if (!cropState || !cropPointers[e.pointerId]) return;
+    cropPointers[e.pointerId] = {x:e.clientX, y:e.clientY};
+    var ids = Object.keys(cropPointers);
+    if (ids.length === 2 && cropPinch){
+      var p1 = cropPointers[ids[0]], p2 = cropPointers[ids[1]];
+      var dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+      var rect = cropEls.viewport.getBoundingClientRect();
+      var factor = dist / (cropPinch.startDist || 1);
+      setCropScale(cropPinch.startScale * factor, cropPinch.midX - rect.left, cropPinch.midY - rect.top);
+    } else if (cropPanStart && ids.length === 1){
+      cropState.x = cropPanStart.ox + (e.clientX - cropPanStart.startX);
+      cropState.y = cropPanStart.oy + (e.clientY - cropPanStart.startY);
+      clampCropPos();
+      applyCropTransform();
+    }
+  });
+  function endCropPointer(e){
+    delete cropPointers[e.pointerId];
+    var ids = Object.keys(cropPointers);
+    if (ids.length < 2) cropPinch = null;
+    if (ids.length === 0) cropPanStart = null;
+    else if (ids.length === 1){
+      var only = cropPointers[ids[0]];
+      cropPanStart = {startX:only.x, startY:only.y, ox:cropState.x, oy:cropState.y};
+    }
+  }
+  cropEls.viewport.addEventListener("pointerup", endCropPointer);
+  cropEls.viewport.addEventListener("pointercancel", endCropPointer);
+  cropEls.viewport.addEventListener("wheel", function(e){
+    if (!cropState) return;
+    e.preventDefault();
+    var rect = cropEls.viewport.getBoundingClientRect();
+    var factor = e.deltaY < 0 ? 1.1 : 0.9;
+    setCropScale(cropState.scale * factor, e.clientX - rect.left, e.clientY - rect.top);
+  }, {passive:false});
 
   function pillBtn(val,label,current){
     return '<button type="button" class="pill' + (current===val?' active':'') + '" data-val="' + val + '">' + label + '</button>';
@@ -1030,9 +1216,9 @@
     document.getElementById("avatarPickBtn").addEventListener("click", function(){ avatarFile.click(); });
     avatarFile.addEventListener("change", function(){
       var file = avatarFile.files && avatarFile.files[0];
+      avatarFile.value = ""; // allow re-picking the same file later
       if (!file) return;
-      resizePhotoFile(file, function(dataUrl){
-        if (!dataUrl) return;
+      openCropper(file, function(dataUrl){
         photoHidden.value = dataUrl;
         avatarPreview.src = dataUrl;
         avatarPreview.classList.add("filled");
