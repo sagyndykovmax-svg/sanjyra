@@ -8,6 +8,7 @@
 <meta name="description" content="Родовое древо, которое родственники дополняют по ссылке — без регистрации, прямо в браузере.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yeseva+One&family=Manrope:wght@400;500;600;700;800&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <style>
   *{box-sizing:border-box;}
   html,body{margin:0; padding:0; height:100%;}
@@ -189,6 +190,25 @@
   }
   .crop-actions{display:flex; gap:10px; width:100%; max-width:320px; margin-top:22px;}
   .crop-actions .btn{flex:1; justify-content:center; padding:12px 14px;}
+
+  /* ---------- QR overlay ---------- */
+  .qr-overlay{
+    position:fixed; inset:0; z-index:65; background:rgba(10,8,4,0.72); display:none;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .qr-overlay.open{display:flex;}
+  .qr-box{
+    background:var(--surface-2); border-radius:20px; padding:26px 24px 22px;
+    max-width:340px; width:100%; text-align:center; box-shadow:var(--shadow);
+  }
+  .qr-box h3{font-family:var(--font-display); font-weight:400; font-size:18px; margin:0 0 4px;}
+  .qr-box .subnote{margin:14px 0 18px;}
+  .qr-holder{
+    width:236px; height:236px; margin:6px auto 0; padding:12px; background:#fff; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .qr-holder svg{width:100%; height:100%; display:block;}
+  .qr-box .btn{width:100%; justify-content:center; padding:12px 14px;}
 
   .fab{
     position:absolute; right:20px; bottom:22px; z-index:15;
@@ -372,6 +392,7 @@
     <div class="topbar-actions">
       <button class="btn btn-ghost" id="btnExample" title="Посмотреть пример дерева"><span>📖</span><span class="lbl">Пример</span></button>
       <button class="btn btn-ghost" id="btnFit" title="Показать всё дерево"><span>⤢</span><span class="lbl">Показать всё</span></button>
+      <button class="btn btn-ghost" id="btnQr" title="Показать QR-код ссылки">QR</button>
       <button class="btn btn-primary" id="btnShare"><span>🔗</span><span class="lbl">Скопировать ссылку</span></button>
     </div>
   </header>
@@ -459,6 +480,15 @@
   <div class="crop-actions">
     <button type="button" class="btn btn-ghost" id="cropCancel">Отмена</button>
     <button type="button" class="btn btn-primary" id="cropConfirm">Готово</button>
+  </div>
+</div>
+
+<div class="qr-overlay" id="qrOverlay">
+  <div class="qr-box">
+    <h3>Отсканируйте на другом телефоне</h3>
+    <p class="subnote">Та же ссылка, что и «Скопировать» — просто картинкой, ничего копировать не нужно</p>
+    <div class="qr-holder" id="qrHolder"></div>
+    <button class="btn btn-ghost" id="qrClose" style="margin-top:20px;">Закрыть</button>
   </div>
 </div>
 
@@ -1463,6 +1493,26 @@
   els.treeTitle.addEventListener("change", function(){
     state.title = els.treeTitle.value.trim() || "Санжыра";
     saveState();
+  });
+
+  document.getElementById("btnQr").addEventListener("click", function(){
+    saveState().then(function(){
+      var holder = document.getElementById("qrHolder");
+      try{
+        var qr = qrcode(0, "L"); // typeNumber 0 = smallest version that fits; L = max data capacity
+        qr.addData(location.href);
+        qr.make();
+        holder.innerHTML = qr.createSvgTag({scalable: true});
+      }catch(e){
+        holder.innerHTML = "";
+        showToast("Дерево слишком большое для QR-кода — используйте «Скопировать ссылку»");
+        return;
+      }
+      document.getElementById("qrOverlay").classList.add("open");
+    });
+  });
+  document.getElementById("qrClose").addEventListener("click", function(){
+    document.getElementById("qrOverlay").classList.remove("open");
   });
 
   document.getElementById("btnShare").addEventListener("click", function(){
