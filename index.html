@@ -196,9 +196,14 @@
   .legend i.unk{border:1.5px solid var(--ink-faint); border-radius:50%;}
 
   /* ---------- example banner ---------- */
+  /* In normal flow (not absolutely positioned over the canvas) so it pushes
+     the tree down instead of covering the first generation's cards — it
+     used to float over the canvas and hide the top row on short/mobile
+     screens. */
+  .example-banner-row{display:flex; justify-content:center; padding:0 16px;}
   .example-banner{
-    position:absolute; left:50%; top:14px; transform:translateX(-50%); z-index:16;
-    max-width:min(92vw,520px); display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    margin:10px auto 0; max-width:min(92vw,520px);
+    align-items:center; gap:10px; flex-wrap:wrap;
     background:var(--surface); border:1px solid var(--gold); border-radius:999px;
     padding:8px 8px 8px 16px; box-shadow:var(--shadow); font-size:12.5px; color:var(--ink-muted);
   }
@@ -345,16 +350,18 @@
     </div>
   </header>
 
+  <div class="example-banner-row">
+    <div class="example-banner" id="exampleBanner" style="display:none;">
+      <span>Это <strong>пример</strong> — покажите родным, как это выглядит.</span>
+      <button id="btnStartOwn">Начать свою санжыру</button>
+    </div>
+  </div>
+
   <div class="canvas-wrap" id="canvasWrap">
     <div class="legend" id="legend">
       <span><i class="male"></i>муж.</span>
       <span><i class="female"></i>жен.</span>
       <span><i class="unk"></i>—</span>
-    </div>
-
-    <div class="example-banner" id="exampleBanner" style="display:none;">
-      <span>Это <strong>пример</strong> — покажите родным, как это выглядит.</span>
-      <button id="btnStartOwn">Начать свою санжыру</button>
     </div>
 
     <div class="canvas" id="canvas">
@@ -690,7 +697,7 @@
         ? '<img class="avatar" src="' + escapeAttr(p.photo) + '" alt="">'
         : '<span class="glyph ' + glyphClass + '"></span>';
       nodesHtml += '<div class="card' + (p.photo ? ' has-photo' : '') + '" tabindex="0" data-id="' + id + '" style="left:' + x + 'px; top:' + y + 'px;">' +
-        '<div class="row1">' + avatarHtml + '<span class="name">' + escapeHtml(p.name || "Без имени") + '</span></div>' +
+        '<div class="row1">' + avatarHtml + '<span class="name">' + escapeHtml(p.name || (p.placeholder ? "Неизвестный предок" : "Без имени")) + '</span></div>' +
         (years ? '<div class="years">' + escapeHtml(years) + '</div>' : '') +
         (p.note ? '<div class="note">' + escapeHtml(p.note) + '</div>' : '') +
         '</div>';
@@ -956,12 +963,10 @@
       if (!person.motherId) rels += '<button data-rel="mother">+ Мать</button>';
       if (!person.spouseId) rels += '<button data-rel="spouse">+ Супруг(а)</button>';
       rels += '<button data-rel="child">+ Ребёнок</button>';
-      if (person.fatherId || person.motherId){
-        rels += '<button data-rel="sibling">+ Брат / сестра</button>';
-      }
+      rels += '<button data-rel="sibling">+ Брат / сестра</button>';
       html += '<div class="divider"></div><div class="relations" id="relBtns">' + rels + '</div>';
       if (!person.fatherId && !person.motherId){
-        html += '<p class="subnote">Чтобы добавить брата или сестру, сначала укажите отца или мать этого человека.</p>';
+        html += '<p class="subnote">Родители не указаны — при добавлении брата/сестры появится общий «неизвестный предок», его можно переименовать позже.</p>';
       }
       html += '<div class="sheet-actions">' +
         '<button class="btn btn-primary" id="saveBtn">Сохранить</button>' +
@@ -1129,8 +1134,20 @@
         if (forPerson.spouseId) np.motherId = forPerson.spouseId;
       }
     } else if (rel === "sibling"){
-      np.fatherId = forPerson.fatherId || null;
-      np.motherId = forPerson.motherId || null;
+      if (forPerson.fatherId || forPerson.motherId){
+        np.fatherId = forPerson.fatherId || null;
+        np.motherId = forPerson.motherId || null;
+      } else {
+        // Neither parent is recorded yet (common for the oldest generation
+        // you know) — create one shared, unnamed anchor so the two siblings
+        // still hang together in the tree instead of blocking the action.
+        // The card just shows "Неизвестный предок"; rename it any time you
+        // learn the name, or leave it as is.
+        var anchorId = uid();
+        state.people[anchorId] = {id:anchorId, name:"", gender:"u", birth:"", death:"", note:"", photo:"", placeholder:true, fatherId:null, motherId:null, spouseId:null};
+        forPerson.fatherId = anchorId;
+        np.fatherId = anchorId;
+      }
     }
     state.people[id] = np;
   }
