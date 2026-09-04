@@ -396,11 +396,12 @@
   .example-overlay-bar strong{font-family:var(--font-display); font-weight:400; font-size:15px; color:var(--ink);}
   .example-overlay-bar p{margin:1px 0 0; font-size:11.5px; color:var(--ink-muted);}
   #previewWrap{
-    flex:1; position:relative; overflow:hidden;
+    flex:1; position:relative; overflow:hidden; touch-action:none; cursor:grab;
     background-color:var(--bg);
     background-image:radial-gradient(var(--bg-dot) 1.4px, transparent 1.4px);
     background-size:26px 26px;
   }
+  #previewWrap.panning{cursor:grabbing;}
   #previewCanvas{position:absolute; left:0; top:0; transform-origin:0 0;}
 
   .toast{
@@ -1387,13 +1388,19 @@
   // current wrap, with a little room below that so pinching past "fit" still
   // feels like it's doing something, instead of clamping and stranding
   // whole branches permanently off-screen with no way to zoom out to them.
-  function minScaleForFit(){
-    var wrapRect = els.canvasWrap.getBoundingClientRect();
-    var cw = parseFloat(els.canvas.style.width), ch = parseFloat(els.canvas.style.height);
+  // Shared by both the main canvas and the read-only demo preview below —
+  // the preview used to have its own copy of this floor math with a plain
+  // 0.3 minimum, which is exactly how it went stale the first time this got
+  // fixed here. One implementation, parameterized by which wrap/canvas pair
+  // it's clamping, so there's nothing left to fall out of sync.
+  function minScaleForFitEl(wrapEl, canvasEl){
+    var wrapRect = wrapEl.getBoundingClientRect();
+    var cw = parseFloat(canvasEl.style.width), ch = parseFloat(canvasEl.style.height);
     if (!wrapRect.width || !wrapRect.height || !cw || !ch) return 0.28;
     var fit = Math.min((wrapRect.width - 40) / cw, (wrapRect.height - 40) / ch);
     return Math.min(0.28, fit * 0.85);
   }
+  function minScaleForFit(){ return minScaleForFitEl(els.canvasWrap, els.canvas); }
 
   function clampScale(s){ return Math.max(minScaleForFit(), Math.min(2.2, s)); }
 
@@ -1525,6 +1532,112 @@
     zoomAround(e.clientX - rect.left, e.clientY - rect.top, factor);
   }, {passive:false});
 
+  /* ---------------- preview overlay pan & zoom ---------------- */
+  // Same drag/pinch/wheel behavior as the main canvas above, but on its own
+  // view state so exploring the read-only demo never touches the visitor's
+  // own tree underneath. No card/button target-check on the single-finger
+  // pan start (unlike the main canvas's handler) — the preview has no
+  // click-to-open-card or drag-to-move behavior of its own to protect, so a
+  // drag can start anywhere, cards included.
+  var previewWrapEl = document.getElementById("previewWrap");
+  var previewCanvasEl = document.getElementById("previewCanvas");
+  var previewView = { x:0, y:0, scale:1 };
+  var previewPointers = {};
+  var previewPanState = null;
+  var previewPinchState = null;
+
+  function applyPreviewTransform(){
+    previewCanvasEl.style.transform = "translate(" + previewView.x + "px," + previewView.y + "px) scale(" + previewView.scale + ")";
+  }
+
+  function previewClampScale(s){
+    return Math.max(minScaleForFitEl(previewWrapEl, previewCanvasEl), Math.min(2.2, s));
+  }
+
+  function previewZoomAround(cx, cy, factor){
+    var newScale = previewClampScale(previewView.scale * factor);
+    var wx = (cx - previewView.x) / previewView.scale;
+    var wy = (cy - previewView.y) / previewView.scale;
+    previewView.scale = newScale;
+    previewView.x = cx - wx * previewView.scale;
+    previewView.y = cy - wy * previewView.scale;
+    applyPreviewTransform();
+  }
+
+  function fitPreviewToScreen(){
+    var wrapRect = previewWrapEl.getBoundingClientRect();
+    var cw = parseFloat(previewCanvasEl.style.width) || wrapRect.width;
+    var ch = parseFloat(previewCanvasEl.style.height) || wrapRect.height;
+    var s = Math.min((wrapRect.width - 40) / cw, (wrapRect.height - 40) / ch, 1.05);
+    s = previewClampScale(s);
+    previewView.scale = s;
+    previewView.x = (wrapRect.width - cw * s) / 2;
+    previewView.y = 20;
+    applyPreviewTransform();
+  }
+
+  previewWrapEl.addEventListener("pointerdown", function(e){
+    previewPointers[e.pointerId] = {x:e.clientX, y:e.clientY};
+    var ids = Object.keys(previewPointers);
+    if (ids.length === 1){
+      previewPanState = { startX:e.clientX, startY:e.clientY, ox:previewView.x, oy:previewView.y };
+      previewWrapEl.classList.add("panning");
+      previewWrapEl.setPointerCapture(e.pointerId);
+    } else if (ids.length === 2){
+      previewPanState = null;
+      previewWrapEl.classList.remove("panning");
+      var p1 = previewPointers[ids[0]], p2 = previewPointers[ids[1]];
+      previewPinchState = {
+        startDist: Math.hypot(p2.x-p1.x, p2.y-p1.y),
+        startScale: previewView.scale,
+        midX:(p1.x+p2.x)/2, midY:(p1.y+p2.y)/2
+      };
+    }
+  });
+
+  previewWrapEl.addEventListener("pointermove", function(e){
+    if (!previewPointers[e.pointerId]) return;
+    previewPointers[e.pointerId] = {x:e.clientX, y:e.clientY};
+    var ids = Object.keys(previewPointers);
+    if (ids.length === 2 && previewPinchState){
+      var p1 = previewPointers[ids[0]], p2 = previewPointers[ids[1]];
+      var dist = Math.hypot(p2.x-p1.x, p2.y-p1.y);
+      var rect = previewWrapEl.getBoundingClientRect();
+      var factor = dist / (previewPinchState.startDist || 1);
+      var newScale = previewClampScale(previewPinchState.startScale * factor);
+      var mx = previewPinchState.midX - rect.left, my = previewPinchState.midY - rect.top;
+      var wx = (mx - previewView.x) / previewView.scale, wy = (my - previewView.y) / previewView.scale;
+      previewView.scale = newScale;
+      previewView.x = mx - wx * previewView.scale;
+      previewView.y = my - wy * previewView.scale;
+      applyPreviewTransform();
+    } else if (previewPanState && ids.length === 1){
+      previewView.x = previewPanState.ox + (e.clientX - previewPanState.startX);
+      previewView.y = previewPanState.oy + (e.clientY - previewPanState.startY);
+      applyPreviewTransform();
+    }
+  });
+
+  function endPreviewPointer(e){
+    delete previewPointers[e.pointerId];
+    var ids = Object.keys(previewPointers);
+    if (ids.length < 2) previewPinchState = null;
+    if (ids.length === 0){ previewPanState = null; previewWrapEl.classList.remove("panning"); }
+    else if (ids.length === 1){
+      var only = previewPointers[ids[0]];
+      previewPanState = { startX:only.x, startY:only.y, ox:previewView.x, oy:previewView.y };
+    }
+  }
+  previewWrapEl.addEventListener("pointerup", endPreviewPointer);
+  previewWrapEl.addEventListener("pointercancel", endPreviewPointer);
+
+  previewWrapEl.addEventListener("wheel", function(e){
+    e.preventDefault();
+    var rect = previewWrapEl.getBoundingClientRect();
+    var factor = e.deltaY < 0 ? 1.1 : 0.9;
+    previewZoomAround(e.clientX - rect.left, e.clientY - rect.top, factor);
+  }, {passive:false});
+
   document.getElementById("zoomIn").addEventListener("click", function(){
     var r = els.canvasWrap.getBoundingClientRect();
     zoomAround(r.width/2, r.height/2, 1.2);
@@ -1571,19 +1684,11 @@
     // divide by (effectively) nothing.
     document.getElementById("exampleOverlay").classList.add("open");
 
-    // This overlay is a one-shot static fit with no pan/zoom of its own (see
-    // below — no pointer handlers are bound to previewWrap), so unlike the
-    // interactive canvas there is no way for the visitor to compensate for
-    // a wrong floor by zooming out further. A hard 0.3 minimum here is the
-    // same bug clampScale had: it can force the tree wider than previewWrap
-    // and previewWrap's overflow:hidden then permanently crops whatever
-    // didn't fit — so this fit has no floor at all, just a sane epsilon
-    // against a literal 0/near-0 wrap size.
-    var wrap = document.getElementById("previewWrap");
-    var cw = parseFloat(els.canvas.style.width) || wrap.clientWidth;
-    var ch = parseFloat(els.canvas.style.height) || wrap.clientHeight;
-    var s = Math.max(0.05, Math.min((wrap.clientWidth - 40) / cw, (wrap.clientHeight - 40) / ch, 1.05));
-    els.canvas.style.transform = "translate(" + ((wrap.clientWidth - cw * s) / 2) + "px,20px) scale(" + s + ")";
+    // Fresh fit-to-screen every time the demo is opened, same as the main
+    // canvas's own "Показать всё" — and now, like the main canvas, the
+    // visitor can pinch/drag/scroll from there instead of being stuck with
+    // whatever that fit scale happened to be.
+    fitPreviewToScreen();
 
     state = savedState;
     els.canvas = savedCanvas; els.lines = savedLines; els.nodes = savedNodes;
