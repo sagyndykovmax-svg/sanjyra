@@ -919,7 +919,14 @@
           cursor += diff;
           w = minW;
         }
-        people[id].slot = startX + w/2;
+        // An only child who's married carries their spouse (and that
+        // couple's own kids) into this same span, which skews the span's
+        // midpoint away from the child's actual slot — e.g. a couple's
+        // combined width is off-center from either partner alone. With a
+        // single child there's no sibling row to center over anyway, so
+        // just line up with that child directly instead of the span's
+        // midpoint — otherwise the trunk down to them visibly kinks.
+        people[id].slot = kids.length === 1 ? people[kids[0]].slot : startX + w/2;
       }
       var spId = people[id].spouseId;
       if (spId && people[spId]){
