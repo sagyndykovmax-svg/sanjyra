@@ -1442,15 +1442,22 @@
   var pinchState = null;
 
   els.canvasWrap.addEventListener("pointerdown", function(e){
-    if (e.target.closest(".card, .bud, button, input, textarea, a")) return;
+    // Every finger gets tracked in `pointers`, even one landing on a card —
+    // otherwise a two-finger pinch where either finger happens to land on a
+    // card (near-guaranteed on a packed tree) never reaches ids.length===2
+    // below and pinchState is never created. Only the single-finger PAN
+    // start is skipped for card/button targets, so a lone tap still opens
+    // the card instead of dragging it.
     pointers[e.pointerId] = {x:e.clientX, y:e.clientY};
     var ids = Object.keys(pointers);
     if (ids.length === 1){
+      if (e.target.closest(".card, .bud, button, input, textarea, a")) return;
       panState = { startX:e.clientX, startY:e.clientY, ox:view.x, oy:view.y };
       els.canvasWrap.classList.add("panning");
       els.canvasWrap.setPointerCapture(e.pointerId);
     } else if (ids.length === 2){
       panState = null;
+      els.canvasWrap.classList.remove("panning");
       var p1 = pointers[ids[0]], p2 = pointers[ids[1]];
       pinchState = {
         startDist: Math.hypot(p2.x-p1.x, p2.y-p1.y),
