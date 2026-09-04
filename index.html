@@ -700,12 +700,25 @@
       .catch(function(){ return false; });
   }
 
-  function putServerState(){
+  function putServerState(attempt){
+    attempt = attempt || 1;
     return fetch(API_BASE + "/" + SERVER_CODE, {
       method: "PUT",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({state: state, editToken: EDIT_TOKEN})
-    }).catch(function(){ /* offline / hiccup — the local copy in localStorage is still safe */ });
+    }).then(function(r){
+      if (!r.ok) throw new Error("status_" + r.status);
+    }).catch(function(){
+      // One retry for a plain network blip (common on mobile) before giving
+      // up — but a failed save must never be silent: the local copy in
+      // localStorage is safe, but other viewers (and this device after a
+      // reload) won't see the change until it actually reaches the server.
+      if (attempt < 2){
+        return new Promise(function(resolve){ setTimeout(resolve, 1200); })
+          .then(function(){ return putServerState(attempt + 1); });
+      }
+      showToast("⚠ Не удалось сохранить на сервере — проверьте интернет и повторите");
+    });
   }
 
   /* ---- link encoding ----
@@ -870,19 +883,30 @@
       return true;
     });
 
-    // assign generations via BFS
+    // Assign generations via BFS — but a person can be reachable by more
+    // than one path when a couple links two branches that are each rooted
+    // separately (e.g. two people who married each other both happen to
+    // have their own parents recorded). Whichever path a plain "visit once"
+    // BFS happens to dequeue first would win arbitrarily, which can plant
+    // someone (and everyone below them) several generations too shallow —
+    // their card ends up on the wrong row with a connector that has to
+    // stretch to reach it. The deepest generation reaching someone is the
+    // correct one (it reflects their own recorded birth lineage, which is
+    // more authoritative than an incidental in-law connection), so revisit
+    // and re-propagate whenever a deeper path turns up instead of stopping
+    // at the first visit.
     var visited = {};
     var queue = roots.map(function(id){ return {id:id, gen:0}; });
     var maxGen = 0;
     while(queue.length){
       var item = queue.shift();
-      if (visited[item.id]) continue;
-      visited[item.id] = true;
+      if (visited[item.id] !== undefined && visited[item.id] >= item.gen) continue;
+      visited[item.id] = item.gen;
       people[item.id].generation = item.gen;
       maxGen = Math.max(maxGen, item.gen);
       var sp = people[item.id].spouseId;
-      if (sp && people[sp] && !visited[sp]){
-        visited[sp] = true;
+      if (sp && people[sp] && (visited[sp] === undefined || visited[sp] < item.gen)){
+        visited[sp] = item.gen;
         people[sp].generation = item.gen;
       }
       coupleKids(item.id).forEach(function(cid){
@@ -903,7 +927,19 @@
     var COUPLE_OFFSET = 0.93; // slot units between spouse card centers — keeps a visible gap, no overlap
     var COUPLE_MIN_WIDTH = 1.9;
 
+    // Same multi-path issue as the generation BFS above, but for x-position:
+    // roots.forEach gives each root its own full recursive pass, so if a
+    // person is reachable from two roots (their own blood line, and as an
+    // in-law pulled in through a spouse further down someone else's line),
+    // a second full layout(id) call would silently recompute — and often
+    // relocate — their whole subtree, discarding the first pass's slots
+    // and even double-consuming cursor space for their children. First
+    // pass wins; later attempts are a no-op.
+    var laidOut = {};
+
     function layout(id){
+      if (laidOut[id]) return;
+      laidOut[id] = true;
       var kids = coupleKids(id);
       var minW = (people[id].spouseId && people[people[id].spouseId]) ? COUPLE_MIN_WIDTH : 1;
       var startX = cursor;
@@ -911,11 +947,16 @@
         people[id].slot = cursor + minW/2;
         cursor += minW;
       } else {
+        // A "kid" already laid out (reached earlier via another root, the
+        // cross-branch case above) contributes no fresh width here — it's
+        // just being read, not placed — so it must never be shifted as if
+        // this call had just positioned it.
+        var freshKids = kids.filter(function(cid){ return !laidOut[cid]; });
         kids.forEach(function(cid){ layout(cid); });
         var w = cursor - startX;
         if (w < minW){
           var diff = minW - w;
-          kids.forEach(function(cid){ shiftSubtree(cid, diff/2); });
+          freshKids.forEach(function(cid){ shiftSubtree(cid, diff/2); });
           cursor += diff;
           w = minW;
         }
@@ -929,7 +970,8 @@
         people[id].slot = kids.length === 1 ? people[kids[0]].slot : startX + w/2;
       }
       var spId = people[id].spouseId;
-      if (spId && people[spId]){
+      if (spId && people[spId] && !laidOut[spId]){
+        laidOut[spId] = true;
         people[id].slot -= COUPLE_OFFSET/2;
         people[spId].slot = people[id].slot + COUPLE_OFFSET;
       }
