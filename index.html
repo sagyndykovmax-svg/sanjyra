@@ -1571,10 +1571,18 @@
     // divide by (effectively) nothing.
     document.getElementById("exampleOverlay").classList.add("open");
 
+    // This overlay is a one-shot static fit with no pan/zoom of its own (see
+    // below — no pointer handlers are bound to previewWrap), so unlike the
+    // interactive canvas there is no way for the visitor to compensate for
+    // a wrong floor by zooming out further. A hard 0.3 minimum here is the
+    // same bug clampScale had: it can force the tree wider than previewWrap
+    // and previewWrap's overflow:hidden then permanently crops whatever
+    // didn't fit — so this fit has no floor at all, just a sane epsilon
+    // against a literal 0/near-0 wrap size.
     var wrap = document.getElementById("previewWrap");
     var cw = parseFloat(els.canvas.style.width) || wrap.clientWidth;
     var ch = parseFloat(els.canvas.style.height) || wrap.clientHeight;
-    var s = Math.max(0.3, Math.min((wrap.clientWidth - 40) / cw, (wrap.clientHeight - 40) / ch, 1.05));
+    var s = Math.max(0.05, Math.min((wrap.clientWidth - 40) / cw, (wrap.clientHeight - 40) / ch, 1.05));
     els.canvas.style.transform = "translate(" + ((wrap.clientWidth - cw * s) / 2) + "px,20px) scale(" + s + ")";
 
     state = savedState;
