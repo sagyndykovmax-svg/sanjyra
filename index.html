@@ -167,36 +167,34 @@
 
   .nodes{position:absolute; left:0; top:0;}
   .card{
-    position:absolute; width:176px; min-height:64px; padding:9px 12px;
-    background:var(--surface); border:1px solid var(--line); border-radius:10px;
-    border-left-width:4px; border-left-color:var(--branch-color, var(--line));
-    box-shadow:0 3px 10px -6px rgba(20,15,5,0.35);
-    cursor:pointer; user-select:none;
-    display:flex; flex-direction:column; justify-content:center; gap:2px;
+    position:absolute; width:112px;
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    cursor:pointer; user-select:none; touch-action:none;
   }
-  .card:hover{border-color:var(--gold);}
-  .card{padding:8px 12px;}
+  .card.dragging{cursor:grabbing; z-index:5;}
+  .card .node-circle{
+    position:relative; flex:none; width:60px; height:60px; border-radius:50%;
+    background:var(--surface); border:3px solid var(--branch-color, var(--line));
+    box-shadow:0 3px 10px -6px rgba(20,15,5,0.35);
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+    transition:transform .12s ease, border-color .12s ease;
+  }
+  .card:hover .node-circle{transform:scale(1.06);}
   .card .more-hint{
-    position:absolute; right:-7px; bottom:-7px; width:20px; height:20px; z-index:1;
+    position:absolute; right:-3px; bottom:-3px; width:20px; height:20px; z-index:1;
     border-radius:50%; border:1.5px dashed var(--gold); background:var(--surface);
     color:var(--gold); display:flex; align-items:center; justify-content:center;
     font-size:12px; font-weight:700; line-height:1; letter-spacing:-1px; opacity:.85;
     pointer-events:none; /* purely a hint — the whole card is already the click target */
   }
-  .card.has-photo{padding-left:8px;}
-  .card .row1{display:flex; align-items:center; gap:7px;}
-  .card .avatar{
-    flex:none; width:34px; height:34px; border-radius:50%; object-fit:cover;
-    border:1.5px solid var(--line-strong); background:var(--surface-2);
-  }
-  .card .glyph{flex:none; width:9px; height:9px;}
-  .card .glyph.male{background:var(--male); transform:rotate(45deg); border-radius:2px;}
+  .card .avatar{width:100%; height:100%; object-fit:cover;}
+  .card .glyph{flex:none; width:16px; height:16px;}
+  .card .glyph.male{background:var(--male); transform:rotate(45deg); border-radius:3px;}
   .card .glyph.female{background:var(--female); border-radius:50%;}
-  .card .glyph.unk{border:1.6px solid var(--ink-faint); border-radius:50%;}
-  .card .name{font-size:14px; font-weight:700; line-height:1.2; overflow-wrap:anywhere;}
-  .card .years{font-size:11.5px; color:var(--ink-muted); font-variant-numeric:tabular-nums; margin-left:16px;}
-  .card .note{font-size:11px; color:var(--ink-faint); margin-left:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .card.has-photo .years, .card.has-photo .note{margin-left:41px;}
+  .card .glyph.unk{border:2px solid var(--ink-faint); border-radius:50%;}
+  .card .node-label{text-align:center; line-height:1.25; padding:0 2px;}
+  .card .name{display:block; font-size:12px; font-weight:700; overflow-wrap:anywhere;}
+  .card .years{display:block; font-size:10.5px; color:var(--ink-muted); font-variant-numeric:tabular-nums;}
 
   .avatar-picker{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
   .avatar-picker .avatar-preview{
@@ -575,7 +573,12 @@
 (function(){
   "use strict";
 
-  var CARD_W = 176, CARD_H = 64, COL_GAP = 30, ROW_H = 150, PAD_X = 60, PAD_TOP = 70;
+  // A node is a circle (CIRCLE_D across) with a text label hanging below it;
+  // CARD_W/CARD_H describe the whole node's box (used for horizontal slot
+  // spacing and vertical generation spacing) — CARD_H reaches down past the
+  // label, CARD_W is wide enough for a two-line name to wrap comfortably.
+  var CIRCLE_D = 60, LABEL_GAP = 6, LABEL_H = 40;
+  var CARD_W = 112, CARD_H = CIRCLE_D + LABEL_GAP + LABEL_H, COL_GAP = 22, ROW_H = 170, PAD_X = 60, PAD_TOP = 70;
   var UNIT = CARD_W + COL_GAP;
 
   var STORAGE_KEY = "sanjyra-state-v1";
@@ -1123,6 +1126,19 @@
   function px(slot){ return slot * UNIT; }
   function py(gen){ return gen * ROW_H + PAD_TOP; }
 
+  // Where a node actually renders: the auto-computed grid position, unless
+  // this person has been dragged, in which case their own saved pixel
+  // coordinates (the circle's center) win outright — computeLayout() never
+  // knows or cares about this, so everyone else's auto positions stay
+  // exactly as if this person were still on the grid.
+  function nodePos(id){
+    var p = state.people[id];
+    if (typeof p.manualX === "number" && typeof p.manualY === "number"){
+      return { cx: p.manualX, top: p.manualY - CIRCLE_D/2 };
+    }
+    return { cx: px(p.slot) + PAD_X, top: py(p.generation) };
+  }
+
   function render(){
     els.treeTitle.value = state.title;
     els.treeTitle.readOnly = !CAN_EDIT;
@@ -1160,8 +1176,9 @@
     var genSeen = {};
     ids.forEach(function(id){
       var p = people[id];
-      var x = px(p.slot) + PAD_X - CARD_W/2;
-      var y = py(p.generation);
+      var pos = nodePos(id);
+      var x = pos.cx - CARD_W/2;
+      var y = pos.top;
       var glyphClass = p.gender === "m" ? "male" : (p.gender === "f" ? "female" : "unk");
       var years = "";
       if (p.birth || p.death) years = (p.birth||"?") + "–" + (p.death||"…");
@@ -1170,17 +1187,19 @@
         : '<span class="glyph ' + glyphClass + '"></span>';
       var branchColor = layoutInfo.colorOf[id] || "var(--line)";
       nodesHtml += '<div class="card' + (p.photo ? ' has-photo' : '') + '" tabindex="0" data-id="' + id + '" style="left:' + x + 'px; top:' + y + 'px; --branch-color:' + branchColor + ';">' +
-        '<div class="row1">' + avatarHtml + '<span class="name">' + escapeHtml(p.name || (p.placeholder ? "Неизвестный предок" : "Без имени")) + '</span></div>' +
-        (years ? '<div class="years">' + escapeHtml(years) + '</div>' : '') +
-        (p.note ? '<div class="note">' + escapeHtml(p.note) + '</div>' : '') +
+        '<div class="node-circle">' + avatarHtml +
         (CAN_EDIT ? '<span class="more-hint" title="Нажмите на карточку — можно добавить супруга, брата/сестру, изменить данные">⋯</span>' : '') +
+        '</div>' +
+        '<div class="node-label"><span class="name">' + escapeHtml(p.name || (p.placeholder ? "Неизвестный предок" : "Без имени")) + '</span>' +
+        (years ? '<span class="years">' + escapeHtml(years) + '</span>' : '') +
+        '</div>' +
         '</div>';
       if (!genSeen[p.generation]) genSeen[p.generation] = true;
     });
 
     var linesSvg = "";
     Object.keys(genSeen).sort(function(a,b){return a-b;}).forEach(function(g, idx){
-      linesSvg += '<text class="gen-label-svg" x="' + (PAD_X - 46) + '" y="' + (py(g) + CARD_H/2 + 4) + '" fill="var(--ink-faint)" font-size="11" font-weight="700" letter-spacing="1">ПОКОЛ. ' + (parseInt(g,10)+1) + '</text>';
+      linesSvg += '<text class="gen-label-svg" x="' + (PAD_X - 46) + '" y="' + (py(g) + CIRCLE_D/2 + 4) + '" fill="var(--ink-faint)" font-size="11" font-weight="700" letter-spacing="1">ПОКОЛ. ' + (parseInt(g,10)+1) + '</text>';
     });
 
     // "Growth buds" — small add-relative hints at the tree's actual growing
@@ -1190,8 +1209,9 @@
       var BUD = 24, STUB = 20;
       ids.forEach(function(id){
         var p = people[id];
-        var cx = px(p.slot) + PAD_X;
-        var cardTop = py(p.generation);
+        var pos = nodePos(id);
+        var cx = pos.cx;
+        var cardTop = pos.top;
         var cardBottom = cardTop + CARD_H;
 
         if (!p.fatherId && !p.motherId){
@@ -1226,7 +1246,7 @@
           else isPrimaryOfCouple = id < p.spouseId;
         }
         if (!coupleHasChildren && isPrimaryOfCouple){
-          var midX = partner ? (cx + px(partner.slot) + PAD_X) / 2 : cx;
+          var midX = partner ? (cx + nodePos(p.spouseId).cx) / 2 : cx;
           var by2 = cardBottom + STUB + BUD/2;
           nodesHtml += '<div class="bud child" data-bud="child" data-id="' + id + '" style="left:' + (midX-BUD/2) + 'px; top:' + (by2-BUD/2) + 'px;" title="Добавить ребёнка"><span class="shape"></span><span class="plus"></span></div>';
           linesSvg += '<path class="bud-stub" d="M ' + midX + ' ' + (by2-BUD/2) + ' L ' + midX + ' ' + cardBottom + '"/>';
@@ -1240,13 +1260,11 @@
     var drawnTie = {};
     ids.forEach(function(id){
       var p = people[id];
-      var x = px(p.slot) + PAD_X;
-      var y = py(p.generation);
+      var pos = nodePos(id);
       if (p.spouseId && people[p.spouseId] && !drawnTie[id] && !drawnTie[p.spouseId]){
-        var sp = people[p.spouseId];
-        var x2 = px(sp.slot) + PAD_X;
-        var midY = y + CARD_H/2;
-        linesSvg += '<path class="tie" d="M ' + Math.min(x,x2) + ' ' + midY + ' L ' + Math.max(x,x2) + ' ' + midY + '"/>';
+        var spPos = nodePos(p.spouseId);
+        var midY = pos.top + CIRCLE_D/2;
+        linesSvg += '<path class="tie" d="M ' + Math.min(pos.cx,spPos.cx) + ' ' + midY + ' L ' + Math.max(pos.cx,spPos.cx) + ' ' + midY + '"/>';
         drawnTie[id] = true; drawnTie[p.spouseId] = true;
       }
     });
@@ -1255,11 +1273,12 @@
       var parent = people[parentId];
       var kids = layoutInfo.childrenOf[parentId];
       if (!kids.length) return;
-      var parentX = px(parent.slot) + PAD_X;
+      var parentPos = nodePos(parentId);
+      var parentX = parentPos.cx;
       if (parent.spouseId && people[parent.spouseId]){
-        parentX = (px(parent.slot) + px(people[parent.spouseId].slot)) / 2 + PAD_X;
+        parentX = (parentPos.cx + nodePos(parent.spouseId).cx) / 2;
       }
-      var parentY = py(parent.generation) + CARD_H;
+      var parentY = parentPos.top + CIRCLE_D;
       var branchColor = layoutInfo.colorOf[parentId] || "var(--gold)";
       // One smooth curve per child straight from the parent's own point,
       // instead of a shared right-angle bus bar — reads as a branch
@@ -1269,8 +1288,8 @@
       // crossing another curve is far easier to read than two right angles
       // colliding.
       kids.forEach(function(cid){
-        var cx = px(people[cid].slot) + PAD_X;
-        var cy = py(people[cid].generation);
+        var childPos = nodePos(cid);
+        var cx = childPos.cx, cy = childPos.top;
         var midY = (parentY + cy) / 2;
         linesSvg += '<path style="stroke:' + branchColor + '" d="M ' + parentX + ' ' + parentY +
           ' C ' + parentX + ' ' + midY + ', ' + cx + ' ' + midY + ', ' + cx + ' ' + cy + '"/>';
@@ -1532,6 +1551,10 @@
       html += '<div class="divider"></div><div class="relations" id="relBtns">' + rels + '</div>';
       if (!person.fatherId && !person.motherId){
         html += '<p class="subnote">Родители не указаны — при добавлении брата/сестры появится общий «неизвестный предок», его можно переименовать позже.</p>';
+      }
+      if (typeof person.manualX === "number"){
+        html += '<p class="subnote">Карточка перетащена вручную — авто-расстановка по поколениям для неё отключена.</p>' +
+          '<div class="sheet-actions" style="margin-top:0;"><button type="button" class="btn btn-ghost" id="unpinBtn" style="flex:1;">Вернуть на авто-место</button></div>';
       }
       html += '<div class="sheet-actions">' +
         '<button class="btn btn-primary" id="saveBtn">Сохранить</button>' +
@@ -1820,6 +1843,18 @@
         });
       });
     }
+
+    var unpinBtn = document.getElementById("unpinBtn");
+    if (unpinBtn){
+      unpinBtn.addEventListener("click", function(){
+        var p = state.people[mode.id];
+        delete p.manualX; delete p.manualY;
+        saveState();
+        render();
+        closeSheet();
+        showToast("Вернули на авто-место");
+      });
+    }
   }
 
   function addRelative(rel, forId, data){
@@ -1914,9 +1949,67 @@
     toastTimer = setTimeout(function(){ els.toast.classList.remove("show"); }, 2200);
   }
 
+  /* ---------------- free-form node dragging ---------------- */
+
+  // An editor can pick up a node and drop it anywhere on the canvas —
+  // manualX/manualY (the circle's own center, in canvas pixels) then wins
+  // over the auto-computed grid position for that person from then on (see
+  // nodePos above); computeLayout() never knows or cares, so everyone
+  // else's auto position stays exactly as if this person were still on the
+  // grid. A pointerdown that never moves past a small threshold is left
+  // alone as a plain click (opens the sheet) — listening on document for
+  // move/up (rather than relying on setPointerCapture on the card itself)
+  // because render() replaces the card's DOM node on every drag step, which
+  // would silently drop a capture held on it.
+  var nodeDrag = null;
+  var nodeDragMoved = false;
+  var suppressNextNodeClick = false;
+
+  els.nodes.addEventListener("pointerdown", function(e){
+    if (!CAN_EDIT) return;
+    if (e.target.closest(".bud")) return;
+    var card = e.target.closest(".card");
+    if (!card) return;
+    var id = card.getAttribute("data-id");
+    var pos = nodePos(id);
+    nodeDrag = {
+      id: id, pointerId: e.pointerId,
+      startClientX: e.clientX, startClientY: e.clientY,
+      startCx: pos.cx, startCy: pos.top + CIRCLE_D/2
+    };
+  });
+  document.addEventListener("pointermove", function(e){
+    if (!nodeDrag || e.pointerId !== nodeDrag.pointerId) return;
+    var dx = (e.clientX - nodeDrag.startClientX) / view.scale;
+    var dy = (e.clientY - nodeDrag.startClientY) / view.scale;
+    if (!nodeDragMoved){
+      if (Math.hypot(dx, dy) < 4) return;
+      nodeDragMoved = true;
+    }
+    state.people[nodeDrag.id].manualX = nodeDrag.startCx + dx;
+    state.people[nodeDrag.id].manualY = nodeDrag.startCy + dy;
+    render();
+    var liveCard = els.nodes.querySelector('.card[data-id="' + nodeDrag.id + '"]');
+    if (liveCard) liveCard.classList.add("dragging");
+  });
+  function endNodeDrag(e){
+    if (!nodeDrag || e.pointerId !== nodeDrag.pointerId) return;
+    var wasMoved = nodeDragMoved;
+    nodeDrag = null;
+    nodeDragMoved = false;
+    if (wasMoved){
+      saveState();
+      suppressNextNodeClick = true;
+      render(); // rebuilds the node fresh — clears the transient "dragging" class/cursor
+    }
+  }
+  document.addEventListener("pointerup", endNodeDrag);
+  document.addEventListener("pointercancel", endNodeDrag);
+
   /* ---------------- wire up top-level controls ---------------- */
 
   els.nodes.addEventListener("click", function(e){
+    if (suppressNextNodeClick){ suppressNextNodeClick = false; return; }
     var bud = e.target.closest(".bud");
     if (bud){
       var rel = bud.getAttribute("data-bud");
