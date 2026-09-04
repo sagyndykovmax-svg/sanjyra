@@ -1380,7 +1380,22 @@
     els.canvas.style.transform = "translate(" + view.x + "px," + view.y + "px) scale(" + view.scale + ")";
   }
 
-  function clampScale(s){ return Math.max(0.28, Math.min(2.2, s)); }
+  // 0.28 is fine for a small tree, but a wide/tall one (e.g. the 7-generation
+  // example) can need to shrink further just to fit the screen at all —
+  // especially in a constrained viewport like an in-app browser sheet. Floor
+  // the minimum at whatever scale actually fits the current canvas into the
+  // current wrap, with a little room below that so pinching past "fit" still
+  // feels like it's doing something, instead of clamping and stranding
+  // whole branches permanently off-screen with no way to zoom out to them.
+  function minScaleForFit(){
+    var wrapRect = els.canvasWrap.getBoundingClientRect();
+    var cw = parseFloat(els.canvas.style.width), ch = parseFloat(els.canvas.style.height);
+    if (!wrapRect.width || !wrapRect.height || !cw || !ch) return 0.28;
+    var fit = Math.min((wrapRect.width - 40) / cw, (wrapRect.height - 40) / ch);
+    return Math.min(0.28, fit * 0.85);
+  }
+
+  function clampScale(s){ return Math.max(minScaleForFit(), Math.min(2.2, s)); }
 
   function zoomAround(cx, cy, factor){
     var newScale = clampScale(view.scale * factor);
