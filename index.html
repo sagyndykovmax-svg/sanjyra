@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>Санжыра</title>
 <meta name="description" content="Родовое древо, которое родственники дополняют по ссылке — без регистрации, прямо в браузере.">
@@ -79,7 +79,7 @@
   .topbar{
     position:relative; z-index:20;
     display:flex; align-items:center; justify-content:space-between; gap:14px;
-    padding:14px 20px; background:var(--surface-2);
+    padding:calc(14px + env(safe-area-inset-top)) 20px 14px; background:var(--surface-2);
     border-bottom:1px solid var(--line);
   }
   .topbar::after{
@@ -130,6 +130,34 @@
     position:absolute; font-size:11px; letter-spacing:.09em; text-transform:uppercase;
     color:var(--ink-faint); font-weight:700; white-space:nowrap;
   }
+
+  /* ---------- growth buds ----------
+     Small hint markers at the tree's actual growing tips — above a person
+     with no recorded parents, below one with no recorded children — each
+     on its own dashed stub, like a bud on a branch. Reuses the card's own
+     gender-glyph shapes (diamond/circle) so a bud reads as "add a father"
+     or "add a mother" without needing a label. */
+  .bud{
+    position:absolute; width:24px; height:24px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--gold); opacity:.85; transition:opacity .15s ease, transform .15s ease;
+  }
+  .bud:hover{opacity:1; transform:scale(1.12);}
+  .bud .shape{
+    position:absolute; inset:0; border:1.6px dashed var(--gold); background:var(--surface);
+  }
+  .bud.father .shape{border-radius:4px; transform:rotate(45deg);}
+  .bud.mother .shape{border-radius:50%;}
+  .bud.child .shape{border-radius:50%;}
+  .bud .plus{
+    position:relative; width:9px; height:9px; z-index:1;
+  }
+  .bud .plus::before, .bud .plus::after{
+    content:""; position:absolute; background:var(--gold);
+  }
+  .bud .plus::before{left:0; right:0; top:4px; height:1.6px;}
+  .bud .plus::after{top:0; bottom:0; left:4px; width:1.6px;}
+  .lines .bud-stub{stroke:var(--gold); stroke-width:1.4px; stroke-dasharray:2.5 4; opacity:.6;}
 
   .nodes{position:absolute; left:0; top:0;}
   .card{
@@ -362,11 +390,28 @@
   }
   .toast.show{opacity:1; transform:translate(-50%,0);}
 
+  #btnMore{display:none;}
+  .more-menu{display:contents;}
+
   @media (max-width:560px){
-    .topbar{padding:12px 14px;}
-    .tree-title{font-size:16px; max-width:44vw;}
+    .topbar{padding:calc(12px + env(safe-area-inset-top)) 14px 12px;}
+    .tree-title{font-size:16px; max-width:38vw;}
     .btn span.lbl{display:none;}
     .example-banner{font-size:11.5px; padding:7px 7px 7px 12px;}
+
+    /* Five icon buttons + the accent share button don't fit a narrow
+       screen without wrapping awkwardly — collapse the secondary ones
+       (Пример / Показать всё / Короче / QR) behind a "⋯" menu, leaving
+       just the title and the one primary action visible. */
+    #btnMore{display:inline-flex;}
+    .more-menu{
+      display:none; position:absolute; top:100%; right:14px; margin-top:8px; z-index:25;
+      flex-direction:column; gap:4px; background:var(--surface-2); border:1px solid var(--line);
+      border-radius:14px; padding:8px; box-shadow:var(--shadow); min-width:190px;
+    }
+    .more-menu.open{display:flex;}
+    .more-menu .btn{justify-content:flex-start; width:100%;}
+    .more-menu .btn span.lbl{display:inline;}
   }
   @media (prefers-reduced-motion: reduce){
     *{transition-duration:0.001ms !important; animation-duration:0.001ms !important;}
@@ -390,10 +435,13 @@
       </div>
     </div>
     <div class="topbar-actions">
-      <button class="btn btn-ghost" id="btnExample" title="Посмотреть пример дерева"><span>📖</span><span class="lbl">Пример</span></button>
-      <button class="btn btn-ghost" id="btnFit" title="Показать всё дерево"><span>⤢</span><span class="lbl">Показать всё</span></button>
-      <button class="btn btn-ghost" id="btnShorten" title="Получить короткую ссылку" style="display:none;">Короче</button>
-      <button class="btn btn-ghost" id="btnQr" title="Показать QR-код ссылки">QR</button>
+      <button class="btn btn-ghost" id="btnMore" title="Ещё" aria-label="Ещё">⋯</button>
+      <div class="more-menu" id="moreMenu">
+        <button class="btn btn-ghost" id="btnExample" title="Посмотреть пример дерева"><span>📖</span><span class="lbl">Пример</span></button>
+        <button class="btn btn-ghost" id="btnFit" title="Показать всё дерево"><span>⤢</span><span class="lbl">Показать всё</span></button>
+        <button class="btn btn-ghost" id="btnShorten" title="Получить короткую ссылку" style="display:none;">Короче</button>
+        <button class="btn btn-ghost" id="btnQr" title="Показать QR-код ссылки">QR</button>
+      </div>
       <button class="btn btn-primary" id="btnShare"><span>🔗</span><span class="lbl">Скопировать ссылку</span></button>
     </div>
   </header>
@@ -938,12 +986,48 @@
         '</div>';
       if (!genSeen[p.generation]) genSeen[p.generation] = true;
     });
-    els.nodes.innerHTML = nodesHtml;
 
     var linesSvg = "";
     Object.keys(genSeen).sort(function(a,b){return a-b;}).forEach(function(g, idx){
       linesSvg += '<text class="gen-label-svg" x="' + (PAD_X - 46) + '" y="' + (py(g) + CARD_H/2 + 4) + '" fill="var(--ink-faint)" font-size="11" font-weight="700" letter-spacing="1">ПОКОЛ. ' + (parseInt(g,10)+1) + '</text>';
     });
+
+    // "Growth buds" — small add-relative hints at the tree's actual growing
+    // tips (a root with no parents, a leaf with no children), each on its
+    // own dashed stub. Editors only; read-only viewers get none of this.
+    if (CAN_EDIT){
+      var BUD = 24, STUB = 20;
+      ids.forEach(function(id){
+        var p = people[id];
+        var cx = px(p.slot) + PAD_X;
+        var cardTop = py(p.generation);
+        var cardBottom = cardTop + CARD_H;
+
+        if (!p.fatherId && !p.motherId){
+          var need = [];
+          if (!p.fatherId) need.push("father");
+          if (!p.motherId) need.push("mother");
+          var startX = need.length === 2 ? cx - (BUD/2 + 4) : cx;
+          need.forEach(function(rel, i){
+            var bx = need.length === 2 ? (rel === "father" ? cx - (BUD/2 + 4) : cx + (BUD/2 + 4)) : cx;
+            var by = cardTop - STUB - BUD/2;
+            nodesHtml += '<div class="bud ' + rel + '" data-bud="' + rel + '" data-id="' + id + '" style="left:' + (bx-BUD/2) + 'px; top:' + (by-BUD/2) + 'px;" title="' + (rel==="father"?"Добавить отца":"Добавить мать") + '"><span class="shape"></span><span class="plus"></span></div>';
+            linesSvg += '<path class="bud-stub" d="M ' + bx + ' ' + (by+BUD/2) + ' L ' + cx + ' ' + cardTop + '"/>';
+          });
+        }
+
+        var isLeaf = !(layoutInfo.childrenOf[id] && layoutInfo.childrenOf[id].length);
+        var isPrimaryOfCouple = !p.spouseId || id < p.spouseId;
+        if (isLeaf && isPrimaryOfCouple){
+          var midX = (p.spouseId && people[p.spouseId]) ? (cx + px(people[p.spouseId].slot) + PAD_X) / 2 : cx;
+          var by2 = cardBottom + STUB + BUD/2;
+          nodesHtml += '<div class="bud child" data-bud="child" data-id="' + id + '" style="left:' + (midX-BUD/2) + 'px; top:' + (by2-BUD/2) + 'px;" title="Добавить ребёнка"><span class="shape"></span><span class="plus"></span></div>';
+          linesSvg += '<path class="bud-stub" d="M ' + midX + ' ' + (by2-BUD/2) + ' L ' + midX + ' ' + cardBottom + '"/>';
+        }
+      });
+    }
+
+    els.nodes.innerHTML = nodesHtml;
 
     // spouse ties + parent-child connectors
     var drawnTie = {};
@@ -1031,7 +1115,7 @@
   var pinchState = null;
 
   els.canvasWrap.addEventListener("pointerdown", function(e){
-    if (e.target.closest(".card, button, input, textarea, a")) return;
+    if (e.target.closest(".card, .bud, button, input, textarea, a")) return;
     pointers[e.pointerId] = {x:e.clientX, y:e.clientY};
     var ids = Object.keys(pointers);
     if (ids.length === 1){
@@ -1101,6 +1185,23 @@
     zoomAround(r.width/2, r.height/2, 0.8);
   });
   document.getElementById("btnFit").addEventListener("click", fitToScreen);
+
+  // Mobile-only "⋯" menu — on wide screens .more-menu is display:contents
+  // (its buttons just sit inline in the header, this toggle never shows),
+  // on narrow screens it becomes a small dropdown.
+  var moreMenu = document.getElementById("moreMenu");
+  document.getElementById("btnMore").addEventListener("click", function(e){
+    e.stopPropagation();
+    moreMenu.classList.toggle("open");
+  });
+  moreMenu.addEventListener("click", function(e){
+    if (e.target.closest("button")) moreMenu.classList.remove("open");
+  });
+  document.addEventListener("click", function(e){
+    if (moreMenu.classList.contains("open") && !moreMenu.contains(e.target) && e.target.id !== "btnMore"){
+      moreMenu.classList.remove("open");
+    }
+  });
 
   // Shows the demo tree in a full-screen read-only overlay instead of a new
   // tab/window: window.open() and target="_blank" are unreliable in popup
@@ -1607,6 +1708,12 @@
   /* ---------------- wire up top-level controls ---------------- */
 
   els.nodes.addEventListener("click", function(e){
+    var bud = e.target.closest(".bud");
+    if (bud){
+      var rel = bud.getAttribute("data-bud");
+      openSheet({type: "add-relative", rel: rel, forId: bud.getAttribute("data-id")});
+      return;
+    }
     var card = e.target.closest(".card");
     if (!card) return;
     openSheet({type: CAN_EDIT ? "edit" : "view", id: card.getAttribute("data-id")});
