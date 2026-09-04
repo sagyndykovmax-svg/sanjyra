@@ -527,7 +527,7 @@
 <div class="example-overlay" id="exampleOverlay">
   <div class="example-overlay-bar">
     <div>
-      <strong>Пример: санжыра рода Байтемира</strong>
+      <strong>Пример: санжыра рода Байтемира — 7 поколений</strong>
       <p>Только для просмотра — ваше дерево не меняется</p>
     </div>
     <button class="btn btn-primary" id="closeExampleOverlay">✕ Закрыть пример</button>
@@ -620,15 +620,55 @@
 
   function exampleState(){
     return {
-      title: "Пример: Санжыра рода Байтемира",
+      title: "Санжыра рода Байтемира (пример, 7 поколений)",
       isExample: true,
       people: {
-        p1: {id:"p1", name:"Байтемир уулу Асан", gender:"m", birth:"1930", death:"2005", note:"аил Таш-Дөбө", fatherId:null, motherId:null, spouseId:"p2"},
-        p2: {id:"p2", name:"Гүлсүн эже", gender:"f", birth:"1935", death:"2011", note:"", fatherId:null, motherId:null, spouseId:"p1"},
-        p3: {id:"p3", name:"Нурлан Асанович", gender:"m", birth:"1958", death:"", note:"инженер", fatherId:"p1", motherId:"p2", spouseId:"p4"},
-        p4: {id:"p4", name:"Айгүл Нурлановна", gender:"f", birth:"1962", death:"", note:"", fatherId:null, motherId:null, spouseId:"p3"},
-        p5: {id:"p5", name:"Жамал Асановна", gender:"f", birth:"1960", death:"", note:"", fatherId:"p1", motherId:"p2", spouseId:null},
-        p6: {id:"p6", name:"Динара Нурлановна", gender:"f", birth:"1985", death:"", note:"Бишкек", fatherId:"p3", motherId:"p4", spouseId:null}
+        p0:  {id:"p0",  name:"Байтемир",              gender:"m", birth:"ок. 1878", death:"1952", note:"родоначальник рода, аил Таш-Дөбө", fatherId:null, motherId:null, spouseId:"p0b"},
+        p0b: {id:"p0b", name:"Зуура эне",              gender:"f", birth:"ок. 1882", death:"1958", note:"", fatherId:null, motherId:null, spouseId:"p0"},
+
+        p1:  {id:"p1",  name:"Байтемир уулу Асан",     gender:"m", birth:"1902", death:"1978", note:"чабан, позже председатель колхоза", fatherId:"p0", motherId:"p0b", spouseId:"p2"},
+        p2:  {id:"p2",  name:"Сайра эже",               gender:"f", birth:"1908", death:"1985", note:"", fatherId:null, motherId:null, spouseId:"p1"},
+        p1b: {id:"p1b", name:"Байтемир уулу Токтобек",  gender:"m", birth:"1906", death:"1943", note:"погиб на фронте, детей не оставил", fatherId:"p0", motherId:"p0b", spouseId:null},
+
+        p3:  {id:"p3",  name:"Нурлан Асанович",         gender:"m", birth:"1928", death:"1990", note:"агроном, поднимал целину", fatherId:"p1", motherId:"p2", spouseId:"p4"},
+        p4:  {id:"p4",  name:"Зинаида Ивановна",        gender:"f", birth:"1932", death:"2001", note:"врач-педиатр", fatherId:"p4f", motherId:"p4m", spouseId:"p3"},
+        p4f: {id:"p4f", name:"Иван Петрович Волков",    gender:"m", birth:"1900", death:"1965", note:"инженер-путеец, приехал строить дорогу Фрунзе — Рыбачье", fatherId:null, motherId:null, spouseId:"p4m"},
+        p4m: {id:"p4m", name:"Мария Волкова",           gender:"f", birth:"1905", death:"1970", note:"", fatherId:null, motherId:null, spouseId:"p4f"},
+
+        p5:  {id:"p5",  name:"Айша Асановна",           gender:"f", birth:"1930", death:"1995", note:"швея", fatherId:"p1", motherId:"p2", spouseId:"p6"},
+        p6:  {id:"p6",  name:"Токтогул уулу Мурат",     gender:"m", birth:"1927", death:"1980", note:"плотник", fatherId:null, motherId:null, spouseId:"p5"},
+
+        p7:  {id:"p7",  name:"Данияр Асанович",         gender:"m", birth:"1935", death:"2020", note:"ветеринар", fatherId:"p1", motherId:"p2", spouseId:"p8"},
+        p8:  {id:"p8",  name:"Клара Дюшеновна",         gender:"f", birth:"1938", death:"", note:"на пенсии, живёт в Бишкеке; детей не было", fatherId:null, motherId:null, spouseId:"p7"},
+
+        p9:  {id:"p9",  name:"Динара Нурлановна",       gender:"f", birth:"1955", death:"", note:"врач, Бишкек", fatherId:"p3", motherId:"p4", spouseId:"p10"},
+        p10: {id:"p10", name:"Марат Сыдыкович",         gender:"m", birth:"1953", death:"2018", note:"юрист", fatherId:null, motherId:null, spouseId:"p9"},
+
+        p13: {id:"p13", name:"Салтанат Нурлановна",     gender:"f", birth:"1962", death:"", note:"переехала в Германию в 1994, переводчик", fatherId:"p3", motherId:"p4", spouseId:"p14"},
+        p14: {id:"p14", name:"Хайнрих Шмидт",           gender:"m", birth:"1959", death:"", note:"инженер, Франкфурт", fatherId:"p14f", motherId:null, spouseId:"p13"},
+        p14f:{id:"p14f",name:"Отто Шмидт",              gender:"m", birth:"1930", death:"2005", note:"инженер на заводе, Франкфурт", fatherId:null, motherId:null, spouseId:null},
+
+        p15: {id:"p15", name:"Гүлнара Муратовна",       gender:"f", birth:"1952", death:"", note:"учительница, Ош", fatherId:"p6", motherId:"p5", spouseId:"p16"},
+        p16: {id:"p16", name:"Эмиль Тураевич",          gender:"m", birth:"1950", death:"2015", note:"директор школы", fatherId:null, motherId:null, spouseId:"p15"},
+
+        p18: {id:"p18", name:"Алтынай Маратовна",       gender:"f", birth:"1978", death:"", note:"хирург, Бишкек", fatherId:"p10", motherId:"p9", spouseId:"p19"},
+        p19: {id:"p19", name:"Руслан Бекович",          gender:"m", birth:"1976", death:"", note:"предприниматель", fatherId:null, motherId:null, spouseId:"p18"},
+
+        p20: {id:"p20", name:"Эркин Маратович",         gender:"m", birth:"1982", death:"", note:"программист, переехал в Сиэтл (США)", fatherId:"p10", motherId:"p9", spouseId:"p21"},
+        p21: {id:"p21", name:"Дженнифер Коул",          gender:"f", birth:"1984", death:"", note:"маркетолог, американка", fatherId:null, motherId:null, spouseId:"p20"},
+
+        p27: {id:"p27", name:"Нурбек Эмилевич",         gender:"m", birth:"1975", death:"", note:"фермер, Ошская область", fatherId:"p16", motherId:"p15", spouseId:"p28"},
+        p28: {id:"p28", name:"Айгерим Каныбековна",     gender:"f", birth:"1978", death:"", note:"", fatherId:null, motherId:null, spouseId:"p27"},
+
+        p29: {id:"p29", name:"Медер Русланович",        gender:"m", birth:"2000", death:"", note:"программист, Москва", fatherId:"p19", motherId:"p18", spouseId:"p38"},
+        p38: {id:"p38", name:"Элиза Тынычбековна",      gender:"f", birth:"2001", death:"", note:"дизайнер", fatherId:null, motherId:null, spouseId:"p29"},
+        p30: {id:"p30", name:"Айпери Руслановна",       gender:"f", birth:"2003", death:"", note:"студентка, Бишкек", fatherId:"p19", motherId:"p18", spouseId:null},
+
+        p31: {id:"p31", name:"Алекс Эркинович Коул",    gender:"m", birth:"2008", death:"", note:"школьник, Сиэтл", fatherId:"p20", motherId:"p21", spouseId:null},
+
+        p36: {id:"p36", name:"Азамат Нурбекович",       gender:"m", birth:"2001", death:"", note:"служит в армии", fatherId:"p27", motherId:"p28", spouseId:null},
+
+        p39: {id:"p39", name:"Эмир Медерович",          gender:"m", birth:"2023", death:"", note:"седьмое поколение рода", fatherId:"p29", motherId:"p38", spouseId:null}
       }
     };
   }
