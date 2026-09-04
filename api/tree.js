@@ -10,6 +10,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { randomBytes } from "node:crypto";
 import { redis } from "./_redis.js";
+import { isValidTreeState } from "./_validate.js";
 
 const createLimit = new Ratelimit({
   redis,
@@ -43,6 +44,10 @@ export default async function handler(req, res) {
   const body = req.body;
   if (!body || typeof body !== "object" || !body.state || typeof body.state !== "object") {
     res.status(400).json({ error: "invalid_body" });
+    return;
+  }
+  if (!isValidTreeState(body.state)) {
+    res.status(400).json({ error: "invalid_state_shape" });
     return;
   }
   const stateJson = JSON.stringify(body.state);

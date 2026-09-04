@@ -100,13 +100,14 @@
     font-family:var(--font-display); font-size:19px; line-height:1.15; color:var(--ink);
     background:transparent; border:1px solid transparent; border-radius:8px;
     padding:2px 6px; margin-left:-6px; max-width:52vw;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
   .tree-title:hover, .tree-title:focus{border-color:var(--line); outline:none; background:var(--surface);}
   .tree-stats{font-size:12px; color:var(--ink-muted); margin-top:2px; letter-spacing:.01em; font-variant-numeric:tabular-nums;}
   .topbar-actions{display:flex; align-items:center; gap:8px; flex:none;}
   .btn{
-    display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
-    font-size:13.5px; font-weight:600; padding:9px 14px; border-radius:999px;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap;
+    font-size:13.5px; font-weight:600; padding:9px 14px; min-height:44px; border-radius:999px;
     border:1px solid var(--line-strong); background:var(--surface); color:var(--ink);
     cursor:pointer; transition:transform .12s ease, background .15s ease;
   }
@@ -144,15 +145,20 @@
      gender-glyph shapes (diamond/circle) so a bud reads as "add a father"
      or "add a mother" without needing a label. */
   .bud{
-    position:absolute; width:24px; height:24px; cursor:pointer;
+    /* The tappable box (44px) is bigger than the drawn shape (24px, still
+       centered on the same point) — a wider hit area without the bud
+       visually ballooning past the rest of the small-shape vocabulary. */
+    position:absolute; width:44px; height:44px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:var(--gold); opacity:.85; transition:opacity .15s ease, transform .15s ease;
   }
-  .bud:hover{opacity:1; transform:scale(1.12);}
+  .bud:hover, .bud:focus-visible{opacity:1; transform:scale(1.12);}
+  .bud:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:50%;}
   .bud .shape{
-    position:absolute; inset:0; border:1.6px dashed var(--gold); background:var(--surface);
+    position:absolute; width:24px; height:24px; top:50%; left:50%; transform:translate(-50%,-50%);
+    border:1.6px dashed var(--gold); background:var(--surface);
   }
-  .bud.father .shape{border-radius:4px; transform:rotate(45deg);}
+  .bud.father .shape{border-radius:4px; transform:translate(-50%,-50%) rotate(45deg);}
   .bud.mother .shape{border-radius:50%;}
   .bud.child .shape{border-radius:50%;}
   .bud .plus{
@@ -263,7 +269,7 @@
     border-radius:12px; overflow:hidden; box-shadow:var(--shadow); border:1px solid var(--line);
   }
   .zoom-controls button{
-    width:38px; height:38px; border:none; background:var(--surface); color:var(--ink);
+    width:44px; height:44px; border:none; background:var(--surface); color:var(--ink);
     font-size:18px; cursor:pointer; border-bottom:1px solid var(--line);
   }
   .zoom-controls button:last-child{border-bottom:none;}
@@ -328,7 +334,10 @@
   .field{margin-bottom:14px;}
   .field label{display:block; font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted); margin-bottom:6px;}
   .field input[type=text], .field textarea{
-    width:100%; font-family:inherit; font-size:15px; color:var(--ink); background:var(--surface);
+    /* 16px, not smaller — iOS Safari auto-zooms the viewport on focusing
+       any input under that size, and this form is the single most
+       frequent interaction in the app. */
+    width:100%; font-family:inherit; font-size:16px; color:var(--ink); background:var(--surface);
     border:1px solid var(--line-strong); border-radius:10px; padding:10px 12px; resize:vertical;
   }
   .field input:focus, .field textarea:focus{outline:none; border-color:var(--accent);}
@@ -816,6 +825,11 @@
   }
 
   function saveState(){
+    // Poking at the demo (including dragging a card) is scratch work, not
+    // data — never persist it, so a later visit always starts from a
+    // clean example instead of whatever a curious first-time visitor left
+    // behind before ever clicking "Начать свою санжыру".
+    if (state.isExample) return Promise.resolve();
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
 
     if (SERVER_CODE){
@@ -1166,6 +1180,15 @@
 
     var canvasW = px(layoutInfo.maxSlot) + PAD_X * 2;
     var canvasH = py(layoutInfo.maxGen) + CARD_H + 100;
+    // A node dragged out past the auto-grid's own footprint used to be
+    // invisible to this box — reachable by panning, but "Показать всё"
+    // would fit to the old (now too-small) bounds and clip it at the edge.
+    ids.forEach(function(id){
+      var p = people[id];
+      if (typeof p.manualX !== "number") return;
+      canvasW = Math.max(canvasW, p.manualX + CARD_W/2 + PAD_X);
+      canvasH = Math.max(canvasH, p.manualY + CIRCLE_D/2 + LABEL_GAP + LABEL_H + 60);
+    });
     els.canvas.style.width = canvasW + "px";
     els.canvas.style.height = canvasH + "px";
     els.lines.setAttribute("width", canvasW);
@@ -1206,13 +1229,17 @@
     // tips (a root with no parents, a leaf with no children), each on its
     // own dashed stub. Editors only; read-only viewers get none of this.
     if (CAN_EDIT){
-      var BUD = 24, STUB = 20;
+      // BUD is the drawn shape's size; BUD_HIT is the (larger) tappable box
+      // centered on the same point — a 44px hit target without the shape
+      // itself ballooning past the rest of the small-glyph vocabulary.
+      var BUD = 24, BUD_HIT = 44, STUB = 20;
       ids.forEach(function(id){
         var p = people[id];
         var pos = nodePos(id);
         var cx = pos.cx;
         var cardTop = pos.top;
         var cardBottom = cardTop + CARD_H;
+        var forWhom = p.name ? " для " + p.name : "";
 
         if (!p.fatherId && !p.motherId){
           var need = [];
@@ -1222,7 +1249,8 @@
           need.forEach(function(rel, i){
             var bx = need.length === 2 ? (rel === "father" ? cx - (BUD/2 + 4) : cx + (BUD/2 + 4)) : cx;
             var by = cardTop - STUB - BUD/2;
-            nodesHtml += '<div class="bud ' + rel + '" data-bud="' + rel + '" data-id="' + id + '" style="left:' + (bx-BUD/2) + 'px; top:' + (by-BUD/2) + 'px;" title="' + (rel==="father"?"Добавить отца":"Добавить мать") + '"><span class="shape"></span><span class="plus"></span></div>';
+            var label = (rel === "father" ? "Добавить отца" : "Добавить мать") + forWhom;
+            nodesHtml += '<div class="bud ' + rel + '" data-bud="' + rel + '" data-id="' + id + '" tabindex="0" role="button" aria-label="' + escapeAttr(label) + '" style="left:' + (bx-BUD_HIT/2) + 'px; top:' + (by-BUD_HIT/2) + 'px;" title="' + (rel==="father"?"Добавить отца":"Добавить мать") + '"><span class="shape"></span><span class="plus"></span></div>';
             linesSvg += '<path class="bud-stub" d="M ' + bx + ' ' + (by+BUD/2) + ' L ' + cx + ' ' + cardTop + '"/>';
           });
         }
@@ -1248,7 +1276,7 @@
         if (!coupleHasChildren && isPrimaryOfCouple){
           var midX = partner ? (cx + nodePos(p.spouseId).cx) / 2 : cx;
           var by2 = cardBottom + STUB + BUD/2;
-          nodesHtml += '<div class="bud child" data-bud="child" data-id="' + id + '" style="left:' + (midX-BUD/2) + 'px; top:' + (by2-BUD/2) + 'px;" title="Добавить ребёнка"><span class="shape"></span><span class="plus"></span></div>';
+          nodesHtml += '<div class="bud child" data-bud="child" data-id="' + id + '" tabindex="0" role="button" aria-label="' + escapeAttr("Добавить ребёнка" + forWhom) + '" style="left:' + (midX-BUD_HIT/2) + 'px; top:' + (by2-BUD_HIT/2) + 'px;" title="Добавить ребёнка"><span class="shape"></span><span class="plus"></span></div>';
           linesSvg += '<path class="bud-stub" d="M ' + midX + ' ' + (by2-BUD/2) + ' L ' + midX + ' ' + cardBottom + '"/>';
         }
       });
@@ -1336,6 +1364,37 @@
     view.x = (wrapRect.width - cw * s) / 2;
     view.y = 24;
     applyTransform();
+  }
+
+  // The very first fit-to-screen on page load raced getBoundingClientRect()
+  // against fonts/layout that hadn't actually settled yet, occasionally
+  // measuring a near-zero wrap and landing on the minimum clamp — the tree
+  // would render as a barely-visible speck in a corner until the user
+  // manually hit "Показать всё". Wait for fonts (when supported) plus two
+  // animation frames — layout is reliably settled by then. rAF itself never
+  // fires for a hidden/backgrounded tab though (a plausible way to open a
+  // shared link — a share-sheet flow that briefly backgrounds the browser,
+  // several tabs opened at once), so a plain timeout and a one-shot
+  // visibilitychange listener both back it up; whichever fires first wins,
+  // the rest are no-ops. Every later call to fitToScreen() stays synchronous.
+  function fitWhenReady(){
+    var done = false;
+    function run(){
+      if (done) return;
+      done = true;
+      fitToScreen();
+    }
+    function afterFonts(){
+      requestAnimationFrame(function(){ requestAnimationFrame(run); });
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(afterFonts, afterFonts);
+    else afterFonts();
+    setTimeout(run, 400);
+    document.addEventListener("visibilitychange", function onVis(){
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", onVis);
+      run();
+    });
   }
 
   var pointers = {};
@@ -1972,10 +2031,15 @@
     if (!card) return;
     var id = card.getAttribute("data-id");
     var pos = nodePos(id);
+    var person = state.people[id];
     nodeDrag = {
       id: id, pointerId: e.pointerId,
       startClientX: e.clientX, startClientY: e.clientY,
-      startCx: pos.cx, startCy: pos.top + CIRCLE_D/2
+      startCx: pos.cx, startCy: pos.top + CIRCLE_D/2,
+      // so Escape can put it back exactly where it was — including "was
+      // never manually placed at all" for someone still on the auto grid
+      hadManual: typeof person.manualX === "number",
+      origX: person.manualX, origY: person.manualY
     };
   });
   document.addEventListener("pointermove", function(e){
@@ -2005,6 +2069,15 @@
   }
   document.addEventListener("pointerup", endNodeDrag);
   document.addEventListener("pointercancel", endNodeDrag);
+  document.addEventListener("keydown", function(e){
+    if (e.key !== "Escape" || !nodeDrag) return;
+    var person = state.people[nodeDrag.id];
+    if (nodeDrag.hadManual){ person.manualX = nodeDrag.origX; person.manualY = nodeDrag.origY; }
+    else { delete person.manualX; delete person.manualY; }
+    nodeDrag = null;
+    nodeDragMoved = false;
+    render(); // no saveState() — cancelling means nothing was ever committed
+  });
 
   /* ---------------- wire up top-level controls ---------------- */
 
@@ -2022,6 +2095,12 @@
   });
   els.nodes.addEventListener("keydown", function(e){
     if (e.key !== "Enter" && e.key !== " ") return;
+    var bud = e.target.closest(".bud");
+    if (bud){
+      e.preventDefault();
+      openSheet({type: "add-relative", rel: bud.getAttribute("data-bud"), forId: bud.getAttribute("data-id")});
+      return;
+    }
     var card = e.target.closest(".card");
     if (!card) return;
     e.preventDefault();
@@ -2130,7 +2209,7 @@
   loadState().then(function(s){
     state = s;
     render();
-    setTimeout(fitToScreen, 30);
+    fitWhenReady();
     if (loadedFromLink) setTimeout(function(){ showToast("Дерево загружено по ссылке"); }, 400);
   });
 

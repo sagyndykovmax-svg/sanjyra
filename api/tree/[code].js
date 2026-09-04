@@ -3,6 +3,7 @@
 //                        must match what POST /api/tree returned at creation.
 import { Ratelimit } from "@upstash/ratelimit";
 import { redis } from "../_redis.js";
+import { isValidTreeState } from "../_validate.js";
 
 const readLimit = new Ratelimit({
   redis,
@@ -46,6 +47,10 @@ export default async function handler(req, res) {
     const body = req.body;
     if (!body || typeof body !== "object" || !body.state || !body.editToken) {
       res.status(400).json({ error: "invalid_body" });
+      return;
+    }
+    if (!isValidTreeState(body.state)) {
+      res.status(400).json({ error: "invalid_state_shape" });
       return;
     }
     const stateJson = JSON.stringify(body.state);
