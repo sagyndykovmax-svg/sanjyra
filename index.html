@@ -29,6 +29,8 @@
     --line-strong:rgba(35,42,59,0.28);
     --shadow:0 10px 30px -14px rgba(35,26,14,0.35);
     --radius:14px;
+    --br-0:#2E5C4B; --br-1:#6B3FA0; --br-2:#1D6E96; --br-3:#B5651D;
+    --br-4:#3E7C3F; --br-5:#9C4A6B; --br-6:#4A5FA5; --br-7:#A0522D;
     --font-display:'Yeseva One', Georgia, 'Times New Roman', serif;
     --font-body:'Manrope', 'Segoe UI', system-ui, sans-serif;
   }
@@ -49,6 +51,8 @@
       --line:rgba(236,230,214,0.14);
       --line-strong:rgba(236,230,214,0.26);
       --shadow:0 10px 34px -14px rgba(0,0,0,0.55);
+      --br-0:#4FA98A; --br-1:#B08AE0; --br-2:#5EC3E8; --br-3:#E0A45C;
+      --br-4:#7FCB7F; --br-5:#E896B0; --br-6:#93A6E8; --br-7:#E0906A;
     }
   }
   :root[data-theme="dark"]{
@@ -67,6 +71,8 @@
     --line:rgba(236,230,214,0.14);
     --line-strong:rgba(236,230,214,0.26);
     --shadow:0 10px 34px -14px rgba(0,0,0,0.55);
+    --br-0:#4FA98A; --br-1:#B08AE0; --br-2:#5EC3E8; --br-3:#E0A45C;
+    --br-4:#7FCB7F; --br-5:#E896B0; --br-6:#93A6E8; --br-7:#E0906A;
   }
 
   body{background:var(--bg); color:var(--ink); font-family:var(--font-body);}
@@ -163,6 +169,7 @@
   .card{
     position:absolute; width:176px; min-height:64px; padding:9px 12px;
     background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    border-left-width:4px; border-left-color:var(--branch-color, var(--line));
     box-shadow:0 3px 10px -6px rgba(20,15,5,0.35);
     cursor:pointer; user-select:none;
     display:flex; flex-direction:column; justify-content:center; gap:2px;
@@ -850,6 +857,36 @@
       }
     });
 
+    // Branch colors — purely cosmetic, so each blood line reads as visually
+    // distinct: everyone with no recorded parents starts a fresh color; a
+    // straight single-child chain keeps it (no fork, no reason to change);
+    // a fork (2+ children) hands each child a brand-new color. That alone
+    // gives "father's line" and "mother's line" their own colors (they're
+    // just two independently-rooted starting colors a marriage happened to
+    // join), and gives an aunt/uncle's whole family its own color the
+    // moment they branch off from a sibling.
+    var BRANCH_COLORS = 8;
+    var colorOf = {};
+    var paletteIdx = 0;
+    function nextBranchColor(){ return "var(--br-" + (paletteIdx++ % BRANCH_COLORS) + ")"; }
+    var colorQueue = [];
+    ids.forEach(function(id){
+      if (!hasParent(people[id])){ colorOf[id] = nextBranchColor(); colorQueue.push(id); }
+    });
+    while (colorQueue.length){
+      var pid = colorQueue.shift();
+      var kids = childrenOf[pid] || [];
+      if (!kids.length) continue;
+      if (kids.length === 1){
+        colorOf[kids[0]] = colorOf[pid];
+      } else {
+        kids.forEach(function(cid){ colorOf[cid] = nextBranchColor(); });
+      }
+      kids.forEach(function(cid){ colorQueue.push(cid); });
+    }
+    // Broken-ref safety net, same spirit as the generation/slot ones below.
+    ids.forEach(function(id){ if (colorOf[id] === undefined) colorOf[id] = nextBranchColor(); });
+
     // A child is always keyed under a single owner (father if recorded, else
     // mother — see above), never under both sides of a couple. Any traversal
     // that walks "this person's children" has to check the spouse's side
@@ -913,6 +950,47 @@
         queue.push({id:cid, gen:item.gen+1});
       });
     }
+
+    // A root with no parents of their own is pinned at generation 0 above —
+    // fine for the top of a trunk, but wrong when that root is really an
+    // ancestor freshly grafted onto someone who already sits deep in the
+    // tree via marriage (e.g. adding a father to a wife whose husband's own
+    // line puts her at generation 4: the new father belongs right above her,
+    // at generation 3, not at the very top with a connector stretching past
+    // three unrelated rows). Pull each such root down to sit just above the
+    // shallowest of their children — but only if ALL of that root's children
+    // agree it's safe: a root with one child pinned deep by marriage and
+    // another child who has nowhere else to be must stay put, or the second
+    // child would end up above their own parent.
+    function shiftGenerationSubtree(id, delta, expectedOldGen){
+      if (people[id].generation !== expectedOldGen) return; // pinned by another path — leave it
+      people[id].generation += delta;
+      var sp = people[id].spouseId;
+      if (sp && people[sp] && people[sp].generation === expectedOldGen) people[sp].generation += delta;
+      coupleKids(id).forEach(function(cid){ shiftGenerationSubtree(cid, delta, expectedOldGen + 1); });
+    }
+    var rootsChanged = true, guard = 0;
+    while (rootsChanged && guard < ids.length){
+      rootsChanged = false; guard++;
+      roots.forEach(function(id){
+        var kids = coupleKids(id);
+        if (!kids.length) return;
+        var minChildGen = Infinity;
+        kids.forEach(function(cid){ minChildGen = Math.min(minChildGen, people[cid].generation); });
+        var desired = minChildGen - 1;
+        var oldGen = people[id].generation;
+        if (desired > oldGen){
+          var delta = desired - oldGen;
+          people[id].generation = desired;
+          var sp = people[id].spouseId;
+          if (sp && people[sp] && people[sp].generation === oldGen) people[sp].generation = desired;
+          kids.forEach(function(cid){ shiftGenerationSubtree(cid, delta, oldGen + 1); });
+          rootsChanged = true;
+        }
+      });
+    }
+    maxGen = 0;
+    ids.forEach(function(id){ if (people[id].generation > maxGen) maxGen = people[id].generation; });
 
     // slot layout (postorder DFS with shifting)
     var cursor = 0;
@@ -999,7 +1077,7 @@
     var maxSlot = 0;
     ids.forEach(function(id){ maxSlot = Math.max(maxSlot, people[id].slot || 0); });
 
-    return { maxGen: maxGen, maxSlot: maxSlot, childrenOf: childrenOf };
+    return { maxGen: maxGen, maxSlot: maxSlot, childrenOf: childrenOf, colorOf: colorOf };
   }
 
   /* ---------------- render ---------------- */
@@ -1054,7 +1132,8 @@
       var avatarHtml = p.photo
         ? '<img class="avatar" src="' + escapeAttr(p.photo) + '" alt="">'
         : '<span class="glyph ' + glyphClass + '"></span>';
-      nodesHtml += '<div class="card' + (p.photo ? ' has-photo' : '') + '" tabindex="0" data-id="' + id + '" style="left:' + x + 'px; top:' + y + 'px;">' +
+      var branchColor = layoutInfo.colorOf[id] || "var(--line)";
+      nodesHtml += '<div class="card' + (p.photo ? ' has-photo' : '') + '" tabindex="0" data-id="' + id + '" style="left:' + x + 'px; top:' + y + 'px; --branch-color:' + branchColor + ';">' +
         '<div class="row1">' + avatarHtml + '<span class="name">' + escapeHtml(p.name || (p.placeholder ? "Неизвестный предок" : "Без имени")) + '</span></div>' +
         (years ? '<div class="years">' + escapeHtml(years) + '</div>' : '') +
         (p.note ? '<div class="note">' + escapeHtml(p.note) + '</div>' : '') +
@@ -1147,16 +1226,18 @@
       var parentY = py(parent.generation) + CARD_H;
       var childGen = people[kids[0]].generation;
       var busY = parentY + (py(childGen) - parentY) * 0.5;
+      var trunkColor = layoutInfo.colorOf[parentId] || "var(--gold)";
 
-      linesSvg += '<path d="M ' + parentX + ' ' + parentY + ' L ' + parentX + ' ' + busY + '"/>';
+      linesSvg += '<path style="stroke:' + trunkColor + '" d="M ' + parentX + ' ' + parentY + ' L ' + parentX + ' ' + busY + '"/>';
       var childXs = kids.map(function(cid){ return px(people[cid].slot) + PAD_X; });
       var minX = Math.min.apply(null, childXs.concat([parentX]));
       var maxX = Math.max.apply(null, childXs.concat([parentX]));
-      linesSvg += '<path d="M ' + minX + ' ' + busY + ' L ' + maxX + ' ' + busY + '"/>';
+      linesSvg += '<path style="stroke:' + trunkColor + '" d="M ' + minX + ' ' + busY + ' L ' + maxX + ' ' + busY + '"/>';
       kids.forEach(function(cid){
         var cx = px(people[cid].slot) + PAD_X;
         var cy = py(people[cid].generation);
-        linesSvg += '<path d="M ' + cx + ' ' + busY + ' L ' + cx + ' ' + cy + '"/>';
+        var dropColor = layoutInfo.colorOf[cid] || "var(--gold)";
+        linesSvg += '<path style="stroke:' + dropColor + '" d="M ' + cx + ' ' + busY + ' L ' + cx + ' ' + cy + '"/>';
       });
     });
 
