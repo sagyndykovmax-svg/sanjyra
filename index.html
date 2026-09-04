@@ -982,9 +982,13 @@
       cursor += 0.9;
     });
 
-    // orphan safety: anyone not visited (broken refs) — place as extra roots
+    // Orphan safety: anyone not visited (broken refs) — place as extra roots.
+    // `visited[id]` holds a generation NUMBER, and roots are legitimately at
+    // generation 0 — `!visited[id]` treats that 0 as falsy and wrongly
+    // re-stomps every root's correct slot/generation here. Must check
+    // "never visited" explicitly instead.
     ids.forEach(function(id){
-      if (!visited[id]){
+      if (visited[id] === undefined){
         people[id].generation = 0;
         people[id].slot = cursor + 0.5;
         cursor += 1;
