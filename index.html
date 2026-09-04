@@ -830,6 +830,21 @@
       }
     });
 
+    // A child is always keyed under a single owner (father if recorded, else
+    // mother — see above), never under both sides of a couple. Any traversal
+    // that walks "this person's children" has to check the spouse's side
+    // too, or it silently misses kids whenever the spouse (not this person)
+    // happens to be the recorded parent — e.g. two people with unspecified
+    // gender, where root/primary selection below can't use the usual
+    // male-preferred rule and picks either side arbitrarily.
+    function coupleKids(id){
+      var p = people[id];
+      var mine = childrenOf[id] || [];
+      var sp = p.spouseId;
+      var theirs = (sp && childrenOf[sp]) || [];
+      return theirs.length ? mine.concat(theirs) : mine;
+    }
+
     // A person is a root (top of their own branch) unless someone else already
     // carries them into the tree: either a recorded parent, or — for a couple
     // with no parents on either side — their spouse, chosen as the single
@@ -863,7 +878,7 @@
         visited[sp] = true;
         people[sp].generation = item.gen;
       }
-      (childrenOf[item.id] || []).forEach(function(cid){
+      coupleKids(item.id).forEach(function(cid){
         queue.push({id:cid, gen:item.gen+1});
       });
     }
@@ -875,14 +890,14 @@
       people[id].slot += dx;
       var sp = people[id].spouseId;
       if (sp && people[sp]) people[sp].slot += dx;
-      (childrenOf[id] || []).forEach(function(cid){ shiftSubtree(cid, dx); });
+      coupleKids(id).forEach(function(cid){ shiftSubtree(cid, dx); });
     }
 
     var COUPLE_OFFSET = 0.93; // slot units between spouse card centers — keeps a visible gap, no overlap
     var COUPLE_MIN_WIDTH = 1.9;
 
     function layout(id){
-      var kids = childrenOf[id] || [];
+      var kids = coupleKids(id);
       var minW = (people[id].spouseId && people[people[id].spouseId]) ? COUPLE_MIN_WIDTH : 1;
       var startX = cursor;
       if (kids.length === 0){
@@ -1016,10 +1031,26 @@
           });
         }
 
-        var isLeaf = !(layoutInfo.childrenOf[id] && layoutInfo.childrenOf[id].length);
-        var isPrimaryOfCouple = !p.spouseId || id < p.spouseId;
-        if (isLeaf && isPrimaryOfCouple){
-          var midX = (p.spouseId && people[p.spouseId]) ? (cx + px(people[p.spouseId].slot) + PAD_X) / 2 : cx;
+        // Children are always keyed in childrenOf under whichever parent is
+        // the "owner" (father if recorded, else mother — see computeLayout),
+        // never under both, and the couple's primary side follows that same
+        // male-preferred rule used for root dedup. Checking isLeaf on just
+        // this one id — instead of either side of the couple — could pick
+        // the non-owning spouse and wrongly call an already-parented couple
+        // childless, dropping a spurious "add child" bud right on top of
+        // their real connector line to their actual kids.
+        var partner = p.spouseId && people[p.spouseId];
+        var coupleHasChildren = !!((layoutInfo.childrenOf[id] && layoutInfo.childrenOf[id].length) ||
+          (partner && layoutInfo.childrenOf[p.spouseId] && layoutInfo.childrenOf[p.spouseId].length));
+        var isPrimaryOfCouple = true;
+        if (partner){
+          var meMale = p.gender === "m", partnerMale = partner.gender === "m";
+          if (meMale && !partnerMale) isPrimaryOfCouple = true;
+          else if (!meMale && partnerMale) isPrimaryOfCouple = false;
+          else isPrimaryOfCouple = id < p.spouseId;
+        }
+        if (!coupleHasChildren && isPrimaryOfCouple){
+          var midX = partner ? (cx + px(partner.slot) + PAD_X) / 2 : cx;
           var by2 = cardBottom + STUB + BUD/2;
           nodesHtml += '<div class="bud child" data-bud="child" data-id="' + id + '" style="left:' + (midX-BUD/2) + 'px; top:' + (by2-BUD/2) + 'px;" title="Добавить ребёнка"><span class="shape"></span><span class="plus"></span></div>';
           linesSvg += '<path class="bud-stub" d="M ' + midX + ' ' + (by2-BUD/2) + ' L ' + midX + ' ' + cardBottom + '"/>';
