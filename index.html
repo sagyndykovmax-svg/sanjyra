@@ -857,35 +857,27 @@
       }
     });
 
-    // Branch colors — purely cosmetic, so each blood line reads as visually
-    // distinct: everyone with no recorded parents starts a fresh color, and
-    // it flows straight down through their descendants (however many kids
-    // each generation has — a couple's own children are still one family,
-    // not a fresh color each). The one exception is the FIRST sibling group
-    // hit while walking down from that root: that single fork is where an
-    // aunt/uncle's whole family splits off with its own color. Once a
-    // lineage has used that one fork, it doesn't fork again — otherwise
-    // every generation with more than one child would keep fragmenting into
-    // new colors and a few generations in the tree would be an unreadable
-    // rainbow instead of a few stable, recognizable branch colors.
+    // Branch colors — purely cosmetic, patrilineal: whoever starts a line
+    // (no recorded parents — a founding ancestor, or an in-law with no
+    // ancestry of their own recorded, like a wife marrying in) gets a fresh
+    // color, and every one of their descendants keeps it, full stop, no
+    // matter how many children appear at any generation along the way —
+    // brothers, their children, their children's children all stay the same
+    // color as the grandfather. Color only changes again where a genuinely
+    // separate, independently-rooted line joins the tree through marriage
+    // (that person, and their own recorded ancestors, carry their own color
+    // in on their own card) — never just because a couple had more than
+    // one child.
     var BRANCH_COLORS = 8;
     var colorOf = {};
     var paletteIdx = 0;
     function nextBranchColor(){ return "var(--br-" + (paletteIdx++ % BRANCH_COLORS) + ")"; }
-    function propagateColor(id, color, alreadyForked){
+    function propagateColor(id, color){
       colorOf[id] = color;
-      var kids = childrenOf[id] || [];
-      if (!kids.length) return;
-      if (kids.length === 1){
-        propagateColor(kids[0], color, alreadyForked);
-      } else if (alreadyForked){
-        kids.forEach(function(cid){ propagateColor(cid, color, true); });
-      } else {
-        kids.forEach(function(cid){ propagateColor(cid, nextBranchColor(), true); });
-      }
+      (childrenOf[id] || []).forEach(function(cid){ propagateColor(cid, color); });
     }
     ids.forEach(function(id){
-      if (!hasParent(people[id])) propagateColor(id, nextBranchColor(), false);
+      if (!hasParent(people[id])) propagateColor(id, nextBranchColor());
     });
     // Broken-ref safety net, same spirit as the generation/slot ones below.
     ids.forEach(function(id){ if (colorOf[id] === undefined) colorOf[id] = nextBranchColor(); });
@@ -1268,20 +1260,20 @@
         parentX = (px(parent.slot) + px(people[parent.spouseId].slot)) / 2 + PAD_X;
       }
       var parentY = py(parent.generation) + CARD_H;
-      var childGen = people[kids[0]].generation;
-      var busY = parentY + (py(childGen) - parentY) * 0.5;
-      var trunkColor = layoutInfo.colorOf[parentId] || "var(--gold)";
-
-      linesSvg += '<path style="stroke:' + trunkColor + '" d="M ' + parentX + ' ' + parentY + ' L ' + parentX + ' ' + busY + '"/>';
-      var childXs = kids.map(function(cid){ return px(people[cid].slot) + PAD_X; });
-      var minX = Math.min.apply(null, childXs.concat([parentX]));
-      var maxX = Math.max.apply(null, childXs.concat([parentX]));
-      linesSvg += '<path style="stroke:' + trunkColor + '" d="M ' + minX + ' ' + busY + ' L ' + maxX + ' ' + busY + '"/>';
+      var branchColor = layoutInfo.colorOf[parentId] || "var(--gold)";
+      // One smooth curve per child straight from the parent's own point,
+      // instead of a shared right-angle bus bar — reads as a branch
+      // splitting off a trunk rather than a wiring diagram, and where two
+      // unrelated branches have to pass near each other (an in-law's own
+      // ancestor sharing a row with people from a different line) a curve
+      // crossing another curve is far easier to read than two right angles
+      // colliding.
       kids.forEach(function(cid){
         var cx = px(people[cid].slot) + PAD_X;
         var cy = py(people[cid].generation);
-        var dropColor = layoutInfo.colorOf[cid] || "var(--gold)";
-        linesSvg += '<path style="stroke:' + dropColor + '" d="M ' + cx + ' ' + busY + ' L ' + cx + ' ' + cy + '"/>';
+        var midY = (parentY + cy) / 2;
+        linesSvg += '<path style="stroke:' + branchColor + '" d="M ' + parentX + ' ' + parentY +
+          ' C ' + parentX + ' ' + midY + ', ' + cx + ' ' + midY + ', ' + cx + ' ' + cy + '"/>';
       });
     });
 
