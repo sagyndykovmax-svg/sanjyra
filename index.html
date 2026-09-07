@@ -540,6 +540,13 @@
       display:none !important;
     }
     .canvas-wrap{
+      /* .app is still display:flex (only its height/overflow are touched
+         above) and .canvas-wrap is normally flex:1 — a flex item's
+         flex-basis (0% from that shorthand) overrides an explicit height
+         for main-axis sizing, so without flex:none here the height set
+         below was silently ignored and the wrap kept growing to its
+         content's full unscaled size regardless of --print-h. */
+      flex:none !important;
       position:static !important; overflow:hidden !important; touch-action:auto !important;
       width:var(--print-w, auto) !important; height:var(--print-h, auto) !important;
     }
