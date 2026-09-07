@@ -387,6 +387,16 @@
     background:transparent; color:var(--ink-muted); cursor:pointer; text-align:left;
   }
   .relations button:hover{border-color:var(--gold); color:var(--ink);}
+  .chiprow{display:flex; flex-wrap:wrap; gap:6px;}
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; padding:6px 6px 6px 12px; border-radius:999px;
+    background:var(--surface); border:1px solid var(--line-strong); font-size:12.5px; color:var(--ink);
+  }
+  .chip-x{
+    border:none; background:var(--line); color:var(--ink-muted); width:18px; height:18px; border-radius:50%;
+    font-size:11px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
+  }
+  .chip-x:hover{background:var(--female); color:#fff;}
   .divider{height:1px; background:var(--line); margin:16px 0;}
   .subnote{font-size:12px; color:var(--ink-faint); margin-top:-6px; margin-bottom:14px;}
 
@@ -734,52 +744,55 @@
       title: "Санжыра рода Байтемира (пример, 7 поколений)",
       isExample: true,
       people: {
-        p0:  {id:"p0",  name:"Байтемир",              gender:"m", birth:"ок. 1878", death:"1952", note:"родоначальник рода, аил Таш-Дөбө", fatherId:null, motherId:null, spouseId:"p0b"},
-        p0b: {id:"p0b", name:"Зуура эне",              gender:"f", birth:"ок. 1882", death:"1958", note:"", fatherId:null, motherId:null, spouseId:"p0"},
+        p0:  {id:"p0",  name:"Байтемир",              gender:"m", birth:"ок. 1878", death:"1952", note:"родоначальник рода, аил Таш-Дөбө", fatherId:null, motherId:null, spouseIds:["p0b"]},
+        p0b: {id:"p0b", name:"Зуура эне",              gender:"f", birth:"ок. 1882", death:"1958", note:"", fatherId:null, motherId:null, spouseIds:["p0"]},
 
-        p1:  {id:"p1",  name:"Байтемир уулу Асан",     gender:"m", birth:"1902", death:"1978", note:"чабан, позже председатель колхоза", fatherId:"p0", motherId:"p0b", spouseId:"p2"},
-        p2:  {id:"p2",  name:"Сайра эже",               gender:"f", birth:"1908", death:"1985", note:"", fatherId:null, motherId:null, spouseId:"p1"},
-        p1b: {id:"p1b", name:"Байтемир уулу Токтобек",  gender:"m", birth:"1906", death:"1943", note:"погиб на фронте, детей не оставил", fatherId:"p0", motherId:"p0b", spouseId:null},
+        p1:  {id:"p1",  name:"Байтемир уулу Асан",     gender:"m", birth:"1902", death:"1978", note:"чабан, позже председатель колхоза", fatherId:"p0", motherId:"p0b", spouseIds:["p2"]},
+        p2:  {id:"p2",  name:"Сайра эже",               gender:"f", birth:"1908", death:"1985", note:"", fatherId:null, motherId:null, spouseIds:["p1"]},
+        p1b: {id:"p1b", name:"Байтемир уулу Токтобек",  gender:"m", birth:"1906", death:"1943", note:"погиб на фронте, детей не оставил", fatherId:"p0", motherId:"p0b", spouseIds:[]},
 
-        p3:  {id:"p3",  name:"Нурлан Асанович",         gender:"m", birth:"1928", death:"1990", note:"агроном, поднимал целину", fatherId:"p1", motherId:"p2", spouseId:"p4"},
-        p4:  {id:"p4",  name:"Зинаида Ивановна",        gender:"f", birth:"1932", death:"2001", note:"врач-педиатр", fatherId:"p4f", motherId:"p4m", spouseId:"p3"},
-        p4f: {id:"p4f", name:"Иван Петрович Волков",    gender:"m", birth:"1900", death:"1965", note:"инженер-путеец, приехал строить дорогу Фрунзе — Рыбачье", fatherId:null, motherId:null, spouseId:"p4m"},
-        p4m: {id:"p4m", name:"Мария Волкова",           gender:"f", birth:"1905", death:"1970", note:"", fatherId:null, motherId:null, spouseId:"p4f"},
+        p3:  {id:"p3",  name:"Нурлан Асанович",         gender:"m", birth:"1928", death:"1990", note:"агроном, поднимал целину", fatherId:"p1", motherId:"p2", spouseIds:["p4"]},
+        p4:  {id:"p4",  name:"Зинаида Ивановна",        gender:"f", birth:"1932", death:"2001", note:"врач-педиатр", fatherId:"p4f", motherId:"p4m", spouseIds:["p3"]},
+        p4f: {id:"p4f", name:"Иван Петрович Волков",    gender:"m", birth:"1900", death:"1965", note:"инженер-путеец, приехал строить дорогу Фрунзе — Рыбачье", fatherId:null, motherId:null, spouseIds:["p4m"]},
+        p4m: {id:"p4m", name:"Мария Волкова",           gender:"f", birth:"1905", death:"1970", note:"", fatherId:null, motherId:null, spouseIds:["p4f"]},
 
-        p5:  {id:"p5",  name:"Айша Асановна",           gender:"f", birth:"1930", death:"1995", note:"швея", fatherId:"p1", motherId:"p2", spouseId:"p6"},
-        p6:  {id:"p6",  name:"Токтогул уулу Мурат",     gender:"m", birth:"1927", death:"1980", note:"плотник", fatherId:null, motherId:null, spouseId:"p5"},
+        p5:  {id:"p5",  name:"Айша Асановна",           gender:"f", birth:"1930", death:"1995", note:"швея", fatherId:"p1", motherId:"p2", spouseIds:["p6"]},
+        p6:  {id:"p6",  name:"Токтогул уулу Мурат",     gender:"m", birth:"1927", death:"1980", note:"плотник", fatherId:null, motherId:null, spouseIds:["p5"]},
 
-        p7:  {id:"p7",  name:"Данияр Асанович",         gender:"m", birth:"1935", death:"2020", note:"ветеринар", fatherId:"p1", motherId:"p2", spouseId:"p8"},
-        p8:  {id:"p8",  name:"Клара Дюшеновна",         gender:"f", birth:"1938", death:"", note:"на пенсии, живёт в Бишкеке; детей не было", fatherId:null, motherId:null, spouseId:"p7"},
+        p7:  {id:"p7",  name:"Данияр Асанович",         gender:"m", birth:"1935", death:"2020", note:"ветеринар", fatherId:"p1", motherId:"p2", spouseIds:["p8"]},
+        p8:  {id:"p8",  name:"Клара Дюшеновна",         gender:"f", birth:"1938", death:"", note:"на пенсии, живёт в Бишкеке; детей не было", fatherId:null, motherId:null, spouseIds:["p7"]},
 
-        p9:  {id:"p9",  name:"Динара Нурлановна",       gender:"f", birth:"1955", death:"", note:"врач, Бишкек", fatherId:"p3", motherId:"p4", spouseId:"p10"},
-        p10: {id:"p10", name:"Марат Сыдыкович",         gender:"m", birth:"1953", death:"2018", note:"юрист", fatherId:null, motherId:null, spouseId:"p9"},
+        // Марат женился дважды — первая жена умерла молодой, детей от неё
+        // не было; сюда специально положен пример повторного брака.
+        p9:  {id:"p9",  name:"Динара Нурлановна",       gender:"f", birth:"1955", death:"", note:"врач, Бишкек", fatherId:"p3", motherId:"p4", spouseIds:["p10"]},
+        p10: {id:"p10", name:"Марат Сыдыкович",         gender:"m", birth:"1953", death:"2018", note:"юрист", fatherId:null, motherId:null, spouseIds:["p10w1","p9"]},
+        p10w1:{id:"p10w1", name:"Гулбарчын Джумановна", gender:"f", birth:"1951", death:"1974", note:"первая жена Марата Сыдыковича, детей не было", fatherId:null, motherId:null, spouseIds:["p10"]},
 
-        p13: {id:"p13", name:"Салтанат Нурлановна",     gender:"f", birth:"1962", death:"", note:"переехала в Германию в 1994, переводчик", fatherId:"p3", motherId:"p4", spouseId:"p14"},
-        p14: {id:"p14", name:"Хайнрих Шмидт",           gender:"m", birth:"1959", death:"", note:"инженер, Франкфурт", fatherId:"p14f", motherId:null, spouseId:"p13"},
-        p14f:{id:"p14f",name:"Отто Шмидт",              gender:"m", birth:"1930", death:"2005", note:"инженер на заводе, Франкфурт", fatherId:null, motherId:null, spouseId:null},
+        p13: {id:"p13", name:"Салтанат Нурлановна",     gender:"f", birth:"1962", death:"", note:"переехала в Германию в 1994, переводчик", fatherId:"p3", motherId:"p4", spouseIds:["p14"]},
+        p14: {id:"p14", name:"Хайнрих Шмидт",           gender:"m", birth:"1959", death:"", note:"инженер, Франкфурт", fatherId:"p14f", motherId:null, spouseIds:["p13"]},
+        p14f:{id:"p14f",name:"Отто Шмидт",              gender:"m", birth:"1930", death:"2005", note:"инженер на заводе, Франкфурт", fatherId:null, motherId:null, spouseIds:[]},
 
-        p15: {id:"p15", name:"Гүлнара Муратовна",       gender:"f", birth:"1952", death:"", note:"учительница, Ош", fatherId:"p6", motherId:"p5", spouseId:"p16"},
-        p16: {id:"p16", name:"Эмиль Тураевич",          gender:"m", birth:"1950", death:"2015", note:"директор школы", fatherId:null, motherId:null, spouseId:"p15"},
+        p15: {id:"p15", name:"Гүлнара Муратовна",       gender:"f", birth:"1952", death:"", note:"учительница, Ош", fatherId:"p6", motherId:"p5", spouseIds:["p16"]},
+        p16: {id:"p16", name:"Эмиль Тураевич",          gender:"m", birth:"1950", death:"2015", note:"директор школы", fatherId:null, motherId:null, spouseIds:["p15"]},
 
-        p18: {id:"p18", name:"Алтынай Маратовна",       gender:"f", birth:"1978", death:"", note:"хирург, Бишкек", fatherId:"p10", motherId:"p9", spouseId:"p19"},
-        p19: {id:"p19", name:"Руслан Бекович",          gender:"m", birth:"1976", death:"", note:"предприниматель", fatherId:null, motherId:null, spouseId:"p18"},
+        p18: {id:"p18", name:"Алтынай Маратовна",       gender:"f", birth:"1978", death:"", note:"хирург, Бишкек", fatherId:"p10", motherId:"p9", spouseIds:["p19"]},
+        p19: {id:"p19", name:"Руслан Бекович",          gender:"m", birth:"1976", death:"", note:"предприниматель", fatherId:null, motherId:null, spouseIds:["p18"]},
 
-        p20: {id:"p20", name:"Эркин Маратович",         gender:"m", birth:"1982", death:"", note:"программист, переехал в Сиэтл (США)", fatherId:"p10", motherId:"p9", spouseId:"p21"},
-        p21: {id:"p21", name:"Дженнифер Коул",          gender:"f", birth:"1984", death:"", note:"маркетолог, американка", fatherId:null, motherId:null, spouseId:"p20"},
+        p20: {id:"p20", name:"Эркин Маратович",         gender:"m", birth:"1982", death:"", note:"программист, переехал в Сиэтл (США)", fatherId:"p10", motherId:"p9", spouseIds:["p21"]},
+        p21: {id:"p21", name:"Дженнифер Коул",          gender:"f", birth:"1984", death:"", note:"маркетолог, американка", fatherId:null, motherId:null, spouseIds:["p20"]},
 
-        p27: {id:"p27", name:"Нурбек Эмилевич",         gender:"m", birth:"1975", death:"", note:"фермер, Ошская область", fatherId:"p16", motherId:"p15", spouseId:"p28"},
-        p28: {id:"p28", name:"Айгерим Каныбековна",     gender:"f", birth:"1978", death:"", note:"", fatherId:null, motherId:null, spouseId:"p27"},
+        p27: {id:"p27", name:"Нурбек Эмилевич",         gender:"m", birth:"1975", death:"", note:"фермер, Ошская область", fatherId:"p16", motherId:"p15", spouseIds:["p28"]},
+        p28: {id:"p28", name:"Айгерим Каныбековна",     gender:"f", birth:"1978", death:"", note:"", fatherId:null, motherId:null, spouseIds:["p27"]},
 
-        p29: {id:"p29", name:"Медер Русланович",        gender:"m", birth:"2000", death:"", note:"программист, Москва", fatherId:"p19", motherId:"p18", spouseId:"p38"},
-        p38: {id:"p38", name:"Элиза Тынычбековна",      gender:"f", birth:"2001", death:"", note:"дизайнер", fatherId:null, motherId:null, spouseId:"p29"},
-        p30: {id:"p30", name:"Айпери Руслановна",       gender:"f", birth:"2003", death:"", note:"студентка, Бишкек", fatherId:"p19", motherId:"p18", spouseId:null},
+        p29: {id:"p29", name:"Медер Русланович",        gender:"m", birth:"2000", death:"", note:"программист, Москва", fatherId:"p19", motherId:"p18", spouseIds:["p38"]},
+        p38: {id:"p38", name:"Элиза Тынычбековна",      gender:"f", birth:"2001", death:"", note:"дизайнер", fatherId:null, motherId:null, spouseIds:["p29"]},
+        p30: {id:"p30", name:"Айпери Руслановна",       gender:"f", birth:"2003", death:"", note:"студентка, Бишкек", fatherId:"p19", motherId:"p18", spouseIds:[]},
 
-        p31: {id:"p31", name:"Алекс Эркинович Коул",    gender:"m", birth:"2008", death:"", note:"школьник, Сиэтл", fatherId:"p20", motherId:"p21", spouseId:null},
+        p31: {id:"p31", name:"Алекс Эркинович Коул",    gender:"m", birth:"2008", death:"", note:"школьник, Сиэтл", fatherId:"p20", motherId:"p21", spouseIds:[]},
 
-        p36: {id:"p36", name:"Азамат Нурбекович",       gender:"m", birth:"2001", death:"", note:"служит в армии", fatherId:"p27", motherId:"p28", spouseId:null},
+        p36: {id:"p36", name:"Азамат Нурбекович",       gender:"m", birth:"2001", death:"", note:"служит в армии", fatherId:"p27", motherId:"p28", spouseIds:[]},
 
-        p39: {id:"p39", name:"Эмир Медерович",          gender:"m", birth:"2023", death:"", note:"седьмое поколение рода", fatherId:"p29", motherId:"p38", spouseId:null}
+        p39: {id:"p39", name:"Эмир Медерович",          gender:"m", birth:"2023", death:"", note:"седьмое поколение рода", fatherId:"p29", motherId:"p38", spouseIds:[]}
       }
     };
   }
@@ -999,6 +1012,26 @@
 
   function personCount(){ return Object.keys(state.people).length; }
 
+  // A person can have several spouses over a lifetime (widowed and
+  // remarried, more than one wife historically) — stored as spouseIds, an
+  // array, always. Old links saved before this existed a single spouseId
+  // string; normalizeState migrates those in place the moment any state
+  // (a saved link, a server tree, localStorage) is loaded, so the rest of
+  // the app never has to know the old shape still exists out there.
+  function spousesOf(p){ return (p && p.spouseIds) || []; }
+
+  function normalizeState(st){
+    if (!st || !st.people) return st;
+    Object.keys(st.people).forEach(function(id){
+      var p = st.people[id];
+      if (!Array.isArray(p.spouseIds)){
+        p.spouseIds = p.spouseId ? [p.spouseId] : [];
+      }
+      delete p.spouseId;
+    });
+    return st;
+  }
+
   function genderDefault(rel, forPerson){
     if (rel === "father") return "m";
     if (rel === "mother") return "f";
@@ -1013,6 +1046,32 @@
     var ids = Object.keys(people);
     function hasParent(p){
       return !!((p.fatherId && people[p.fatherId]) || (p.motherId && people[p.motherId]));
+    }
+
+    // Marriages chain: B married to both A and C makes {A,B,C} one family
+    // cluster for generation/layout purposes even though A and C were never
+    // married to each other (a widowed-and-remarried hub, most often).
+    // Generation and slot both have to land the WHOLE cluster together, not
+    // just direct spouses — otherwise, reached only as "my spouse's other
+    // spouse", C never gets visited at all and falls through to the
+    // broken-ref safety net at the very bottom, landing at generation 0 in
+    // a random leftover slot. Computed once per person and cached — every
+    // member of a cluster shares the exact same array.
+    var clusterCache = {};
+    function spouseCluster(id){
+      if (clusterCache[id]) return clusterCache[id];
+      var cluster = [], seen = {};
+      var stack = [id];
+      seen[id] = true;
+      while (stack.length){
+        var cur = stack.pop();
+        cluster.push(cur);
+        spousesOf(people[cur]).forEach(function(sp){
+          if (people[sp] && !seen[sp]){ seen[sp] = true; stack.push(sp); }
+        });
+      }
+      cluster.forEach(function(memberId){ clusterCache[memberId] = cluster; });
+      return cluster;
     }
 
     var childrenOf = {};
@@ -1060,27 +1119,43 @@
     function coupleKids(id){
       var p = people[id];
       var mine = childrenOf[id] || [];
-      var sp = p.spouseId;
-      var theirs = (sp && childrenOf[sp]) || [];
+      var theirs = [];
+      spousesOf(p).forEach(function(spId){ theirs = theirs.concat(childrenOf[spId] || []); });
       return theirs.length ? mine.concat(theirs) : mine;
     }
 
+    // Picks a single "primary" out of a group of people (someone plus
+    // however many current spouses) — male preferred, else the smallest id,
+    // same tie-break the app always used for a single couple, just applied
+    // to however many are actually in the group now. Used below to dedupe
+    // roots, and later in render() to put exactly one "add child" bud on a
+    // family instead of one per spouse.
+    function pickPrimary(group){
+      var winner = group[0];
+      group.forEach(function(candId){
+        var cand = people[candId], win = people[winner];
+        var candMale = cand.gender === "m", winMale = win.gender === "m";
+        if (candMale && !winMale) winner = candId;
+        else if (!candMale && winMale){ /* keep current winner */ }
+        else if (candId < winner) winner = candId;
+      });
+      return winner;
+    }
+
     // A person is a root (top of their own branch) unless someone else already
-    // carries them into the tree: either a recorded parent, or — for a couple
-    // with no parents on either side — their spouse, chosen as the single
-    // representative so the pair isn't counted (and excluded) twice.
+    // carries them into the tree: a recorded parent, or ANYONE in their
+    // marriage cluster who DOES have recorded parents (that person's own
+    // line pulls the whole cluster in via the generation BFS's spouse-follow
+    // step below, so listing this person again here would double-count the
+    // same family). Only when NOBODY in the cluster has parents — a fully
+    // unrooted cluster — does it matter who among them is the representative.
     var roots = ids.filter(function(id){
       var p = people[id];
       if (hasParent(p)) return false;
-      if (p.spouseId && people[p.spouseId]){
-        var partner = people[p.spouseId];
-        if (hasParent(partner)) return false;
-        var meMale = p.gender === "m", partnerMale = partner.gender === "m";
-        if (meMale && !partnerMale) return true;
-        if (!meMale && partnerMale) return false;
-        return id < p.spouseId;
-      }
-      return true;
+      var others = spouseCluster(id).filter(function(m){ return m !== id; });
+      if (others.some(function(m){ return hasParent(people[m]); })) return false;
+      if (!others.length) return true;
+      return pickPrimary([id].concat(others)) === id;
     });
 
     // Assign generations via BFS — but a person can be reachable by more
@@ -1104,11 +1179,12 @@
       visited[item.id] = item.gen;
       people[item.id].generation = item.gen;
       maxGen = Math.max(maxGen, item.gen);
-      var sp = people[item.id].spouseId;
-      if (sp && people[sp] && (visited[sp] === undefined || visited[sp] < item.gen)){
-        visited[sp] = item.gen;
-        people[sp].generation = item.gen;
-      }
+      spouseCluster(item.id).forEach(function(sp){
+        if (sp !== item.id && (visited[sp] === undefined || visited[sp] < item.gen)){
+          visited[sp] = item.gen;
+          people[sp].generation = item.gen;
+        }
+      });
       coupleKids(item.id).forEach(function(cid){
         queue.push({id:cid, gen:item.gen+1});
       });
@@ -1128,8 +1204,9 @@
     function shiftGenerationSubtree(id, delta, expectedOldGen){
       if (people[id].generation !== expectedOldGen) return; // pinned by another path — leave it
       people[id].generation += delta;
-      var sp = people[id].spouseId;
-      if (sp && people[sp] && people[sp].generation === expectedOldGen) people[sp].generation += delta;
+      spouseCluster(id).forEach(function(sp){
+        if (sp !== id && people[sp].generation === expectedOldGen) people[sp].generation += delta;
+      });
       coupleKids(id).forEach(function(cid){ shiftGenerationSubtree(cid, delta, expectedOldGen + 1); });
     }
     var rootsChanged = true, guard = 0;
@@ -1145,8 +1222,9 @@
         if (desired > oldGen){
           var delta = desired - oldGen;
           people[id].generation = desired;
-          var sp = people[id].spouseId;
-          if (sp && people[sp] && people[sp].generation === oldGen) people[sp].generation = desired;
+          spouseCluster(id).forEach(function(sp){
+            if (sp !== id && people[sp].generation === oldGen) people[sp].generation = desired;
+          });
           kids.forEach(function(cid){ shiftGenerationSubtree(cid, delta, oldGen + 1); });
           rootsChanged = true;
         }
@@ -1160,13 +1238,11 @@
 
     function shiftSubtree(id, dx){
       people[id].slot += dx;
-      var sp = people[id].spouseId;
-      if (sp && people[sp]) people[sp].slot += dx;
+      spouseCluster(id).forEach(function(sp){ if (sp !== id) people[sp].slot += dx; });
       coupleKids(id).forEach(function(cid){ shiftSubtree(cid, dx); });
     }
 
-    var COUPLE_OFFSET = 0.93; // slot units between spouse card centers — keeps a visible gap, no overlap
-    var COUPLE_MIN_WIDTH = 1.9;
+    var COUPLE_OFFSET = 0.93; // slot units between adjacent spouse card centers — keeps a visible gap, no overlap
 
     // Same multi-path issue as the generation BFS above, but for x-position:
     // roots.forEach gives each root its own full recursive pass, so if a
@@ -1182,7 +1258,8 @@
       if (laidOut[id]) return;
       laidOut[id] = true;
       var kids = coupleKids(id);
-      var minW = (people[id].spouseId && people[people[id].spouseId]) ? COUPLE_MIN_WIDTH : 1;
+      var clusterOthers = spouseCluster(id).filter(function(m){ return m !== id; });
+      var minW = 1 + clusterOthers.length * COUPLE_OFFSET;
       var startX = cursor;
       if (kids.length === 0){
         people[id].slot = cursor + minW/2;
@@ -1210,11 +1287,22 @@
         // midpoint — otherwise the trunk down to them visibly kinks.
         people[id].slot = kids.length === 1 ? people[kids[0]].slot : startX + w/2;
       }
-      var spId = people[id].spouseId;
-      if (spId && people[spId] && !laidOut[spId]){
-        laidOut[spId] = true;
-        people[id].slot -= COUPLE_OFFSET/2;
-        people[spId].slot = people[id].slot + COUPLE_OFFSET;
+      // Fan the WHOLE marriage cluster out from `id`, centered on the slot
+      // just computed above — a single spouse reduces to the exact same
+      // math the app always used (verified equivalent for N=1); more than
+      // one (including a spouse's own other spouse, several marriages deep)
+      // spaces them further right and pulls `id` an equal amount left, so
+      // the whole family row stays centered on that same point instead of
+      // drifting off to one side, or a further-out marriage never getting a
+      // slot at all.
+      var freshSpouses = clusterOthers.filter(function(spId){ return !laidOut[spId]; });
+      if (freshSpouses.length){
+        var shift = (freshSpouses.length * COUPLE_OFFSET) / 2;
+        people[id].slot -= shift;
+        freshSpouses.forEach(function(spId, i){
+          laidOut[spId] = true;
+          people[spId].slot = people[id].slot + (i + 1) * COUPLE_OFFSET;
+        });
       }
     }
 
@@ -1257,14 +1345,16 @@
       byGeneration[g].forEach(function(id){
         if (seen[id]) return;
         seen[id] = true;
-        var sp = people[id].spouseId;
-        if (sp && people[sp] && people[sp].generation === people[id].generation){
-          seen[sp] = true;
-          var a = people[id].slot, b = people[sp].slot;
-          items.push({ids:[id, sp], left: Math.min(a,b) - 0.5, right: Math.max(a,b) + 0.5});
-        } else {
-          items.push({ids:[id], left: people[id].slot - 0.5, right: people[id].slot + 0.5});
-        }
+        var groupIds = [id];
+        var slots = [people[id].slot];
+        spouseCluster(id).forEach(function(sp){
+          if (sp !== id && !seen[sp] && people[sp].generation === people[id].generation){
+            seen[sp] = true;
+            groupIds.push(sp);
+            slots.push(people[sp].slot);
+          }
+        });
+        items.push({ids:groupIds, left: Math.min.apply(null, slots) - 0.5, right: Math.max.apply(null, slots) + 0.5});
       });
       items.sort(function(a,b){ return a.left - b.left; });
       var prevRight = -Infinity;
@@ -1281,7 +1371,26 @@
     var maxSlot = 0;
     ids.forEach(function(id){ maxSlot = Math.max(maxSlot, people[id].slot || 0); });
 
-    return { maxGen: maxGen, maxSlot: maxSlot, childrenOf: childrenOf, colorOf: colorOf };
+    // Who gets the single "add child" bud for a family that may now be
+    // several people wide (several marriages deep) — every member of a
+    // cluster is pointed at the same pickPrimary() winner, computed once
+    // per cluster instead of once per member so they can never disagree.
+    // clusterOf itself is exposed too — render() needs the same "everyone
+    // this person's marriages connect to" grouping for the spouse tie line,
+    // and recomputing it there with its own direct-spouse-only walk is
+    // exactly the kind of duplicated logic that drifted out of sync once
+    // already (the zoom floor, fixed in the main canvas but not the demo
+    // preview's separate copy) — one computation, read in both places.
+    var familyPrimary = {};
+    var clusterOf = {};
+    ids.forEach(function(id){
+      if (familyPrimary[id] !== undefined) return;
+      var cluster = spouseCluster(id);
+      var winner = pickPrimary(cluster);
+      cluster.forEach(function(memberId){ familyPrimary[memberId] = winner; clusterOf[memberId] = cluster; });
+    });
+
+    return { maxGen: maxGen, maxSlot: maxSlot, childrenOf: childrenOf, colorOf: colorOf, familyPrimary: familyPrimary, clusterOf: clusterOf };
   }
 
   /* ---------------- render ---------------- */
@@ -1408,24 +1517,18 @@
 
         // Children are always keyed in childrenOf under whichever parent is
         // the "owner" (father if recorded, else mother — see computeLayout),
-        // never under both, and the couple's primary side follows that same
-        // male-preferred rule used for root dedup. Checking isLeaf on just
-        // this one id — instead of either side of the couple — could pick
-        // the non-owning spouse and wrongly call an already-parented couple
-        // childless, dropping a spurious "add child" bud right on top of
-        // their real connector line to their actual kids.
-        var partner = p.spouseId && people[p.spouseId];
-        var coupleHasChildren = !!((layoutInfo.childrenOf[id] && layoutInfo.childrenOf[id].length) ||
-          (partner && layoutInfo.childrenOf[p.spouseId] && layoutInfo.childrenOf[p.spouseId].length));
-        var isPrimaryOfCouple = true;
-        if (partner){
-          var meMale = p.gender === "m", partnerMale = partner.gender === "m";
-          if (meMale && !partnerMale) isPrimaryOfCouple = true;
-          else if (!meMale && partnerMale) isPrimaryOfCouple = false;
-          else isPrimaryOfCouple = id < p.spouseId;
-        }
+        // never under both, and the couple's primary side follows the same
+        // male-preferred rule used for root dedup (now shared as
+        // familyPrimary, computed once for the whole family — self plus
+        // every current spouse — so a family with more than one spouse
+        // gets exactly one "add child" bud, not one per marriage).
+        var familyOthers = layoutInfo.clusterOf[id].filter(function(m){ return m !== id; });
+        var coupleHasChildren = !!(layoutInfo.childrenOf[id] && layoutInfo.childrenOf[id].length) ||
+          familyOthers.some(function(m){ return layoutInfo.childrenOf[m] && layoutInfo.childrenOf[m].length; });
+        var isPrimaryOfCouple = layoutInfo.familyPrimary[id] === id;
         if (!coupleHasChildren && isPrimaryOfCouple){
-          var midX = partner ? (cx + nodePos(p.spouseId).cx) / 2 : cx;
+          var groupX = [cx].concat(familyOthers.map(function(m){ return nodePos(m).cx; }));
+          var midX = (Math.min.apply(null, groupX) + Math.max.apply(null, groupX)) / 2;
           var by2 = cardBottom + STUB + BUD/2;
           nodesHtml += '<div class="bud child" data-bud="child" data-id="' + id + '" tabindex="0" role="button" aria-label="' + escapeAttr("Добавить ребёнка" + forWhom) + '" style="left:' + (midX-BUD_HIT/2) + 'px; top:' + (by2-BUD_HIT/2) + 'px;" title="Добавить ребёнка"><span class="shape"></span><span class="plus"></span></div>';
           linesSvg += '<path class="bud-stub" d="M ' + midX + ' ' + (by2-BUD/2) + ' L ' + midX + ' ' + cardBottom + '"/>';
@@ -1435,17 +1538,23 @@
 
     els.nodes.innerHTML = nodesHtml;
 
-    // spouse ties + parent-child connectors
-    var drawnTie = {};
+    // Spouse ties — one line per family group (self + every current spouse)
+    // spanning from the leftmost to the rightmost card in that group,
+    // instead of one segment per pair. layout() already places multiple
+    // spouses in a single row fanning out from the primary, so a per-pair
+    // "primary to spouse #2" segment would visually cut straight through
+    // spouse #1's card sitting in between; one spanning line avoids that
+    // and still reads the same as before for the (still by far the most
+    // common) single-spouse case.
+    var tieDrawn = {};
     ids.forEach(function(id){
-      var p = people[id];
-      var pos = nodePos(id);
-      if (p.spouseId && people[p.spouseId] && !drawnTie[id] && !drawnTie[p.spouseId]){
-        var spPos = nodePos(p.spouseId);
-        var midY = pos.top + CIRCLE_D/2;
-        linesSvg += '<path class="tie" d="M ' + Math.min(pos.cx,spPos.cx) + ' ' + midY + ' L ' + Math.max(pos.cx,spPos.cx) + ' ' + midY + '"/>';
-        drawnTie[id] = true; drawnTie[p.spouseId] = true;
-      }
+      if (tieDrawn[id]) return;
+      var group = layoutInfo.clusterOf[id];
+      if (group.length < 2){ tieDrawn[id] = true; return; }
+      group.forEach(function(memberId){ tieDrawn[memberId] = true; });
+      var xs = group.map(function(memberId){ return nodePos(memberId).cx; });
+      var midY = nodePos(id).top + CIRCLE_D/2;
+      linesSvg += '<path class="tie" d="M ' + Math.min.apply(null, xs) + ' ' + midY + ' L ' + Math.max.apply(null, xs) + ' ' + midY + '"/>';
     });
 
     Object.keys(layoutInfo.childrenOf).forEach(function(parentId){
@@ -1453,10 +1562,6 @@
       var kids = layoutInfo.childrenOf[parentId];
       if (!kids.length) return;
       var parentPos = nodePos(parentId);
-      var parentX = parentPos.cx;
-      if (parent.spouseId && people[parent.spouseId]){
-        parentX = (parentPos.cx + nodePos(parent.spouseId).cx) / 2;
-      }
       var parentY = parentPos.top + CIRCLE_D;
       var branchColor = layoutInfo.colorOf[parentId] || "var(--gold)";
       // One smooth curve per child straight from the parent's own point,
@@ -1467,6 +1572,19 @@
       // crossing another curve is far easier to read than two right angles
       // colliding.
       kids.forEach(function(cid){
+        // The curve's start point uses THIS child's own two recorded
+        // parents, not just "parentId's current spouse" — with several
+        // marriages, childrenOf[parentId] can mix kids from more than one
+        // of them, and each one's line has to originate from ITS OWN
+        // parent pair's midpoint, or a child from marriage #1 would appear
+        // to hang from marriage #2's midpoint instead.
+        var child = people[cid];
+        var otherParentId = child.fatherId === parentId ? child.motherId
+          : (child.motherId === parentId ? child.fatherId : null);
+        var parentX = parentPos.cx;
+        if (otherParentId && people[otherParentId]){
+          parentX = (parentPos.cx + nodePos(otherParentId).cx) / 2;
+        }
         var childPos = nodePos(cid);
         var cx = childPos.cx, cy = childPos.top;
         var midY = (parentY + cy) / 2;
@@ -1968,10 +2086,23 @@
     html += '</form>';
 
     if (mode.type === "edit"){
+      var mySpouseIds = spousesOf(person).filter(function(spId){ return state.people[spId]; });
+      if (mySpouseIds.length){
+        var chips = mySpouseIds.map(function(spId){
+          var sp = state.people[spId];
+          return '<span class="chip">' + escapeHtml((sp && sp.name) || "Без имени") +
+            ' <button type="button" class="chip-x" data-unlink-spouse="' + spId + '" title="Убрать как супруга/у (не удаляет человека)">✕</button></span>';
+        }).join("");
+        html += '<div class="field"><label>Супруг(и)</label><div class="chiprow">' + chips + '</div></div>';
+      }
       var rels = "";
       if (!person.fatherId) rels += '<button data-rel="father">+ Отец</button>';
       if (!person.motherId) rels += '<button data-rel="mother">+ Мать</button>';
-      if (!person.spouseId) rels += '<button data-rel="spouse">+ Супруг(а)</button>';
+      // Always offered, not just when childless — someone can have more
+      // than one marriage over a lifetime (widowed and remarried, more
+      // than one wife historically), so a spouse already on record should
+      // never block adding another.
+      rels += '<button data-rel="spouse">+ ' + (mySpouseIds.length ? "Ещё супруг(а)" : "Супруг(а)") + '</button>';
       rels += '<button data-rel="child">+ Ребёнок</button>';
       rels += '<button data-rel="sibling">+ Брат / сестра</button>';
       html += '<div class="divider"></div><div class="relations" id="relBtns">' + rels + '</div>';
@@ -2214,6 +2345,16 @@
       });
     }
 
+    els.sheetContent.querySelectorAll("[data-unlink-spouse]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var otherId = btn.getAttribute("data-unlink-spouse");
+        unlinkSpouses(mode.id, otherId);
+        saveState();
+        render();
+        openSheet(mode); // rebuild the sheet so the chip list reflects the change
+      });
+    });
+
     document.getElementById("cancelBtn").addEventListener("click", closeSheet);
 
     document.getElementById("saveBtn").addEventListener("click", function(){
@@ -2236,7 +2377,7 @@
         addRelative(mode.rel, mode.forId, data);
       } else {
         var id = uid();
-        state.people[id] = Object.assign({id:id, fatherId:null, motherId:null, spouseId:null}, data);
+        state.people[id] = Object.assign({id:id, fatherId:null, motherId:null, spouseIds:[]}, data);
       }
       state.isExample = false;
       render();
@@ -2283,38 +2424,58 @@
     }
   }
 
+  // Marriage is always mutual — every place that adds or removes a spouse
+  // link goes through these two, so both sides can never drift apart.
+  function linkSpouses(idA, idB){
+    var A = state.people[idA], B = state.people[idB];
+    if (!A || !B) return;
+    if (!Array.isArray(A.spouseIds)) A.spouseIds = [];
+    if (!Array.isArray(B.spouseIds)) B.spouseIds = [];
+    if (A.spouseIds.indexOf(idB) === -1) A.spouseIds.push(idB);
+    if (B.spouseIds.indexOf(idA) === -1) B.spouseIds.push(idA);
+  }
+  function unlinkSpouses(idA, idB){
+    var A = state.people[idA], B = state.people[idB];
+    if (A) A.spouseIds = spousesOf(A).filter(function(sid){ return sid !== idB; });
+    if (B) B.spouseIds = spousesOf(B).filter(function(sid){ return sid !== idA; });
+  }
+
   function addRelative(rel, forId, data){
     var forPerson = state.people[forId];
     var id = uid();
-    var np = Object.assign({id:id, fatherId:null, motherId:null, spouseId:null}, data);
+    var np = Object.assign({id:id, fatherId:null, motherId:null, spouseIds:[]}, data);
+    // Inserted before any of the branches below run, not at the end — several
+    // of them call linkSpouses(id, ...), and linkSpouses silently no-ops on
+    // an id that isn't in state.people yet.
+    state.people[id] = np;
 
     if (rel === "father"){
       forPerson.fatherId = id;
       // If the other parent is already recorded, pair them as spouses —
       // otherwise adding father and mother separately leaves them as two
-      // unrelated cards instead of a couple.
-      var existingMother = forPerson.motherId && state.people[forPerson.motherId];
-      if (existingMother && !existingMother.spouseId){
-        existingMother.spouseId = id;
-        np.spouseId = forPerson.motherId;
-      }
+      // unrelated cards instead of a couple. Always safe to link (never
+      // overwrites anything — spouseIds is a list), regardless of how many
+      // other marriages either of them already has on record.
+      if (forPerson.motherId && state.people[forPerson.motherId]) linkSpouses(id, forPerson.motherId);
     } else if (rel === "mother"){
       forPerson.motherId = id;
-      var existingFather = forPerson.fatherId && state.people[forPerson.fatherId];
-      if (existingFather && !existingFather.spouseId){
-        existingFather.spouseId = id;
-        np.spouseId = forPerson.fatherId;
-      }
+      if (forPerson.fatherId && state.people[forPerson.fatherId]) linkSpouses(id, forPerson.fatherId);
     } else if (rel === "spouse"){
-      forPerson.spouseId = id;
-      np.spouseId = forId;
+      linkSpouses(forId, id);
     } else if (rel === "child"){
+      // Auto-fills the other parent only when forPerson has exactly one
+      // current spouse — the one unambiguous case. With none or several,
+      // which marriage this child belongs to isn't guessable from here, so
+      // it's left blank rather than silently attaching the wrong parent;
+      // open the child afterward and add that parent by hand.
+      var mySpouses = spousesOf(forPerson).filter(function(spId){ return state.people[spId]; });
+      var otherParentId = mySpouses.length === 1 ? mySpouses[0] : null;
       if (forPerson.gender === "f"){
         np.motherId = forId;
-        if (forPerson.spouseId) np.fatherId = forPerson.spouseId;
+        if (otherParentId) np.fatherId = otherParentId;
       } else {
         np.fatherId = forId;
-        if (forPerson.spouseId) np.motherId = forPerson.spouseId;
+        if (otherParentId) np.motherId = otherParentId;
       }
     } else if (rel === "sibling"){
       if (forPerson.fatherId || forPerson.motherId){
@@ -2327,12 +2488,11 @@
         // The card just shows "Неизвестный предок"; rename it any time you
         // learn the name, or leave it as is.
         var anchorId = uid();
-        state.people[anchorId] = {id:anchorId, name:"", gender:"u", birth:"", death:"", note:"", photo:"", placeholder:true, fatherId:null, motherId:null, spouseId:null};
+        state.people[anchorId] = {id:anchorId, name:"", gender:"u", birth:"", death:"", note:"", photo:"", placeholder:true, fatherId:null, motherId:null, spouseIds:[]};
         forPerson.fatherId = anchorId;
         np.fatherId = anchorId;
       }
     }
-    state.people[id] = np;
   }
 
   function deletePerson(id){
@@ -2342,7 +2502,7 @@
       var o = state.people[otherId];
       if (o.fatherId === id) o.fatherId = null;
       if (o.motherId === id) o.motherId = null;
-      if (o.spouseId === id) o.spouseId = null;
+      if (o.spouseIds) o.spouseIds = o.spouseIds.filter(function(sid){ return sid !== id; });
     });
     delete state.people[id];
   }
@@ -2630,7 +2790,7 @@
       els.kinshipResult.innerHTML = "<p>Это один и тот же человек.</p>";
       return;
     }
-    if (A.spouseId === idB || B.spouseId === idA){
+    if (spousesOf(A).indexOf(idB) !== -1 || spousesOf(B).indexOf(idA) !== -1){
       var spouseTerm = B.gender === "f" ? "супруга" : (B.gender === "m" ? "супруг" : "супруг(а)");
       els.kinshipResult.innerHTML = "<p>" + escapeHtml(nameB) + " — " + spouseTerm + " для " + escapeHtml(nameA) + ".</p>";
       return;
@@ -2733,7 +2893,7 @@
   /* ---------------- init ---------------- */
 
   loadState().then(function(s){
-    state = s;
+    state = normalizeState(s);
     render();
     fitWhenReady();
     if (loadedFromLink) setTimeout(function(){ showToast("Дерево загружено по ссылке"); }, 400);
