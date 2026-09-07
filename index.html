@@ -491,6 +491,37 @@
   @media (prefers-reduced-motion: reduce){
     *{transition-duration:0.001ms !important; animation-duration:0.001ms !important;}
   }
+
+  /* ---------- print / PDF export ----------
+     Chrome/Safari/Firefox all turn "print" into "save as PDF" for free —
+     no export library needed. The trick is getting the WHOLE tree onto the
+     page instead of whatever's currently panned/zoomed into view: drop the
+     canvas's pan/zoom transform and let it flow at its natural pixel size,
+     then let the print dialog's own "fit to page" scale it down. Colors are
+     forced to a fixed light palette with !important — printing in a dark
+     OS theme would otherwise inherit near-white ink-on-white-paper (invisible
+     text) or a near-black background (wastes a full cartridge of ink), and
+     !important is the only reliable way to outrank the dark-theme rules'
+     own higher-specificity selectors regardless of which one is active. */
+  @media print{
+    :root{
+      --bg:#fff !important; --surface:#fff !important; --surface-2:#fff !important;
+      --ink:#1a1a1a !important; --ink-muted:#555 !important; --ink-faint:#888 !important;
+      --line:#ccc !important; --line-strong:#999 !important; --gold:#8a6415 !important;
+      --male:#2E4A6B !important; --female:#A6394A !important; --accent:#C6402A !important;
+      --br-0:#2E5C4B !important; --br-1:#6B3FA0 !important; --br-2:#1D6E96 !important; --br-3:#B5651D !important;
+      --br-4:#3E7C3F !important; --br-5:#9C4A6B !important; --br-6:#4A5FA5 !important; --br-7:#A0522D !important;
+    }
+    @page{ size:landscape; margin:10mm; }
+    html, body, .app{ height:auto !important; overflow:visible !important; background:#fff !important; }
+    .topbar, .fab, .zoom-controls, .example-banner-row, .legend, .toast,
+    .sheet-backdrop, .sheet, .share-pop, .search-pop, .kinship-overlay,
+    .qr-overlay, .example-overlay, .crop-overlay, .confirm, .bud, .more-hint{
+      display:none !important;
+    }
+    .canvas-wrap{ position:static !important; overflow:visible !important; height:auto !important; touch-action:auto !important; }
+    .canvas{ position:relative !important; transform:none !important; margin:0 auto; }
+  }
 </style>
 </head>
 <body>
@@ -516,6 +547,7 @@
         <button class="btn btn-ghost" id="btnKinship" title="Посчитать родство между двумя людьми"><span>🧬</span><span class="lbl">Родство</span></button>
         <button class="btn btn-ghost" id="btnExample" title="Посмотреть пример дерева"><span>📖</span><span class="lbl">Пример</span></button>
         <button class="btn btn-ghost" id="btnFit" title="Показать всё дерево"><span>⤢</span><span class="lbl">Показать всё</span></button>
+        <button class="btn btn-ghost" id="btnPrint" title="Распечатать или сохранить как PDF"><span>🖨️</span><span class="lbl">Печать</span></button>
         <button class="btn btn-ghost" id="btnShorten" title="Получить короткую ссылку" style="display:none;">Короче</button>
         <button class="btn btn-ghost" id="btnQr" title="Показать QR-код ссылки">QR</button>
       </div>
@@ -1725,6 +1757,15 @@
     zoomAround(r.width/2, r.height/2, 0.8);
   });
   document.getElementById("btnFit").addEventListener("click", fitToScreen);
+
+  // No PDF library needed — the browser's own print dialog IS a PDF
+  // exporter ("Save as PDF" / "Сохранить как PDF" as a destination option).
+  // The @media print rules do the actual work (drop pan/zoom, force a
+  // light palette, hide UI chrome); this just triggers it.
+  document.getElementById("btnPrint").addEventListener("click", function(){
+    moreMenu.classList.remove("open");
+    window.print();
+  });
 
   // Mobile-only "⋯" menu — on wide screens .more-menu is display:contents
   // (its buttons just sit inline in the header, this toggle never shows),
