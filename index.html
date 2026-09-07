@@ -504,15 +504,24 @@
 
   /* ---------- print / PDF export ----------
      Chrome/Safari/Firefox all turn "print" into "save as PDF" for free —
-     no export library needed. The trick is getting the WHOLE tree onto the
-     page instead of whatever's currently panned/zoomed into view: drop the
-     canvas's pan/zoom transform and let it flow at its natural pixel size,
-     then let the print dialog's own "fit to page" scale it down. Colors are
-     forced to a fixed light palette with !important — printing in a dark
-     OS theme would otherwise inherit near-white ink-on-white-paper (invisible
-     text) or a near-black background (wastes a full cartridge of ink), and
-     !important is the only reliable way to outrank the dark-theme rules'
-     own higher-specificity selectors regardless of which one is active. */
+     no export library needed. Colors are forced to a fixed light palette
+     with !important — printing in a dark OS theme would otherwise inherit
+     near-white ink-on-white-paper (invisible text) or a near-black
+     background (wastes a full cartridge of ink), and !important is the
+     only reliable way to outrank the dark-theme rules' own higher-
+     specificity selectors regardless of which one is active. print-color-
+     adjust makes those backgrounds actually print instead of silently
+     depending on the visitor having ticked "Background graphics" in their
+     print dialog, which is unchecked by default in every browser.
+
+     The tree's natural pixel size can be many times a page's — earlier
+     this just let it flow and left the browser to paginate on its own,
+     which sliced straight through the middle of a generation, severing
+     connector lines, with no control over where the cut fell. btnPrint's
+     click handler below measures the canvas and sets --print-scale/
+     --print-w/--print-h so the WHOLE tree is scaled to fit one page,
+     before calling window.print() — plain CSS can't do that measurement,
+     there's no media feature for "how big is the actual canvas". */
   @media print{
     :root{
       --bg:#fff !important; --surface:#fff !important; --surface-2:#fff !important;
@@ -523,14 +532,18 @@
       --br-4:#3E7C3F !important; --br-5:#9C4A6B !important; --br-6:#4A5FA5 !important; --br-7:#A0522D !important;
     }
     @page{ size:landscape; margin:10mm; }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
     html, body, .app{ height:auto !important; overflow:visible !important; background:#fff !important; }
     .topbar, .fab, .zoom-controls, .example-banner-row, .legend, .toast,
     .sheet-backdrop, .sheet, .share-pop, .search-pop, .kinship-overlay,
     .qr-overlay, .example-overlay, .crop-overlay, .confirm, .bud, .more-hint{
       display:none !important;
     }
-    .canvas-wrap{ position:static !important; overflow:visible !important; height:auto !important; touch-action:auto !important; }
-    .canvas{ position:relative !important; transform:none !important; margin:0 auto; }
+    .canvas-wrap{
+      position:static !important; overflow:hidden !important; touch-action:auto !important;
+      width:var(--print-w, auto) !important; height:var(--print-h, auto) !important;
+    }
+    .canvas{ position:relative !important; transform:scale(var(--print-scale, 1)) !important; transform-origin:0 0 !important; margin:0 !important; }
   }
 </style>
 </head>
@@ -1878,11 +1891,31 @@
 
   // No PDF library needed — the browser's own print dialog IS a PDF
   // exporter ("Save as PDF" / "Сохранить как PDF" as a destination option).
-  // The @media print rules do the actual work (drop pan/zoom, force a
-  // light palette, hide UI chrome); this just triggers it.
+  // The @media print rules force a light palette and hide UI chrome; this
+  // measures the canvas and sets the --print-* custom properties they read,
+  // so the WHOLE tree scales down to fit a single page instead of the
+  // browser's default pagination slicing through the middle of it wherever
+  // the page height happens to run out. 1047x718 is A4 landscape (297x210mm)
+  // minus the @page 10mm margin on each side, in CSS px — there's no API to
+  // ask the browser the visitor's actual paper size before printing, so
+  // this is a deliberately conservative estimate (Letter is close enough in
+  // the same ballpark) rather than an exact fit. Never scales UP — a small
+  // tree that already fits prints at its normal 100%.
   document.getElementById("btnPrint").addEventListener("click", function(){
     moreMenu.classList.remove("open");
+    var PRINT_PAGE_W = 1047, PRINT_PAGE_H = 718;
+    var cw = parseFloat(els.canvas.style.width) || 0;
+    var ch = parseFloat(els.canvas.style.height) || 0;
+    var s = (cw > 0 && ch > 0) ? Math.min(1, PRINT_PAGE_W / cw, PRINT_PAGE_H / ch) : 1;
+    els.canvasWrap.style.setProperty("--print-scale", s);
+    els.canvasWrap.style.setProperty("--print-w", (cw * s) + "px");
+    els.canvasWrap.style.setProperty("--print-h", (ch * s) + "px");
     window.print();
+  });
+  window.addEventListener("afterprint", function(){
+    els.canvasWrap.style.removeProperty("--print-scale");
+    els.canvasWrap.style.removeProperty("--print-w");
+    els.canvasWrap.style.removeProperty("--print-h");
   });
 
   // Mobile-only "⋯" menu — on wide screens .more-menu is display:contents
@@ -2017,6 +2050,11 @@
     els.sheetContent.innerHTML = buildSheetHtml(mode);
     if (mode.type === "view"){
       document.getElementById("cancelBtn").addEventListener("click", closeSheet);
+    } else if (mode.type === "link-relative-pick-slot" || mode.type === "link-relative"){
+      // Neither sheet has the usual #personForm (name/gender/birth fields),
+      // so they get their own light binder instead of bindSheetEvents,
+      // which assumes that form exists.
+      bindLinkRelativeEvents(mode);
     } else {
       bindSheetEvents(mode);
     }
@@ -2047,8 +2085,89 @@
     return html;
   }
 
+  // Everyone born "under" id — id's own children, their children, and so
+  // on — computed by scanning for it fresh each time rather than kept as
+  // running state, since the tree is small (tens to a few hundred people)
+  // and this only runs when the link-existing-person picker opens, not on
+  // every render. Used to keep the picker from offering a choice that
+  // would wire a cycle into the tree (making someone their own ancestor).
+  function descendantsOf(id){
+    var seen = {}; seen[id] = true;
+    var stack = [id];
+    while (stack.length){
+      var cur = stack.pop();
+      Object.keys(state.people).forEach(function(pid){
+        var p = state.people[pid];
+        if ((p.fatherId === cur || p.motherId === cur) && !seen[pid]){
+          seen[pid] = true;
+          stack.push(pid);
+        }
+      });
+    }
+    delete seen[id];
+    return seen;
+  }
+
+  // Step 1 of "link an existing person instead of creating a new one" —
+  // added after a real gap surfaced in practice: a mother added as someone's
+  // SPOUSE after their children already existed never became those
+  // children's recorded mother (spouseIds and fatherId/motherId are
+  // separate links, and nothing retroactively connects them), and there was
+  // no way to fix that short of deleting and recreating the children. Pick
+  // which relation slot to fill in; only the ones actually open are offered.
+  function buildLinkSlotSheetHtml(mode){
+    var forPerson = state.people[mode.forId];
+    var slots = "";
+    if (!forPerson.fatherId) slots += '<button type="button" data-rel="father">Отец</button>';
+    if (!forPerson.motherId) slots += '<button type="button" data-rel="mother">Мать</button>';
+    slots += '<button type="button" data-rel="spouse">Супруг(а)</button>';
+    var html = '<h3>Привязать существующего человека</h3>';
+    html += '<p class="subnote">Кем он(а) приходится — ' + escapeHtml(forPerson.name || "этому человеку") + '?</p>';
+    html += '<div class="relations" id="linkSlotBtns">' + slots + '</div>';
+    html += '<div class="sheet-actions" style="margin-top:16px;"><button type="button" class="btn btn-ghost" id="cancelBtn" style="flex:1;">Отмена</button></div>';
+    return html;
+  }
+
+  // Step 2 — pick WHO. Excludes the person themselves always; excludes
+  // their own descendants for father/mother (would wire a cycle — you can't
+  // be your own grandchild's parent); for spouse also excludes their own
+  // ancestors/descendants (marrying your own blood line is a data error,
+  // not a real family shape this app needs to represent) and anyone
+  // already linked as a current spouse (nothing to do there).
+  function buildLinkPersonSheetHtml(mode){
+    var forPerson = state.people[mode.forId];
+    var exclude = {}; exclude[mode.forId] = true;
+    if (mode.rel === "spouse"){
+      Object.keys(ancestorDistances(mode.forId)).forEach(function(pid){ exclude[pid] = true; });
+      Object.keys(descendantsOf(mode.forId)).forEach(function(pid){ exclude[pid] = true; });
+      spousesOf(forPerson).forEach(function(spId){ exclude[spId] = true; });
+    } else {
+      Object.keys(descendantsOf(mode.forId)).forEach(function(pid){ exclude[pid] = true; });
+    }
+    var eligible = Object.keys(state.people).filter(function(pid){ return !exclude[pid]; })
+      .sort(function(a,b){ return (state.people[a].name||"").localeCompare(state.people[b].name||"", "ru"); });
+    var relLabel = {father:"отца", mother:"мать", spouse:"супруга / супругу"}[mode.rel] || "человека";
+    if (!eligible.length){
+      return '<h3>Привязать существующего человека</h3>' +
+        '<p class="subnote">В дереве больше некого сюда привязать.</p>' +
+        '<div class="sheet-actions"><button type="button" class="btn btn-ghost" id="cancelBtn" style="flex:1;">Закрыть</button></div>';
+    }
+    var options = eligible.map(function(pid){
+      var pp = state.people[pid];
+      var years = (pp.birth || pp.death) ? " (" + (pp.birth||"?") + "–" + (pp.death||"…") + ")" : "";
+      return '<option value="' + pid + '">' + escapeHtml(pp.name || "Без имени") + escapeHtml(years) + '</option>';
+    }).join("");
+    var html = '<h3>Выберите ' + relLabel + '</h3>';
+    html += '<div class="field"><select id="linkPersonSelect">' + options + '</select></div>';
+    html += '<div class="sheet-actions"><button type="button" class="btn btn-primary" id="linkConfirmBtn">Привязать</button>' +
+      '<button type="button" class="btn btn-ghost" id="cancelBtn">Отмена</button></div>';
+    return html;
+  }
+
   function buildSheetHtml(mode){
     if (mode.type === "view") return buildViewSheetHtml(mode);
+    if (mode.type === "link-relative-pick-slot") return buildLinkSlotSheetHtml(mode);
+    if (mode.type === "link-relative") return buildLinkPersonSheetHtml(mode);
     var title, person, defaults = {name:"", gender:"u", birth:"", death:"", note:"", photo:""};
     if (mode.type === "edit"){
       person = state.people[mode.id];
@@ -2105,6 +2224,11 @@
       rels += '<button data-rel="spouse">+ ' + (mySpouseIds.length ? "Ещё супруг(а)" : "Супруг(а)") + '</button>';
       rels += '<button data-rel="child">+ Ребёнок</button>';
       rels += '<button data-rel="sibling">+ Брат / сестра</button>';
+      // Separate from the buttons above, which always create a brand-new
+      // person — this one links someone already in the tree (e.g. a
+      // mother added as a spouse only after her children already existed,
+      // so they never got her as their recorded mother).
+      rels += '<button type="button" data-link-existing="1">🔗 Привязать существующего</button>';
       html += '<div class="divider"></div><div class="relations" id="relBtns">' + rels + '</div>';
       if (!person.fatherId && !person.motherId){
         html += '<p class="subnote">Родители не указаны — при добавлении брата/сестры появится общий «неизвестный предок», его можно переименовать позже.</p>';
@@ -2339,6 +2463,10 @@
     var relBtns = document.getElementById("relBtns");
     if (relBtns){
       relBtns.addEventListener("click", function(e){
+        if (e.target.closest("button[data-link-existing]")){
+          openSheet({type:"link-relative-pick-slot", forId:mode.id});
+          return;
+        }
         var btn = e.target.closest("button[data-rel]");
         if (!btn) return;
         openSheet({type:"add-relative", rel:btn.getAttribute("data-rel"), forId:mode.id});
@@ -2438,6 +2566,53 @@
     var A = state.people[idA], B = state.people[idB];
     if (A) A.spouseIds = spousesOf(A).filter(function(sid){ return sid !== idB; });
     if (B) B.spouseIds = spousesOf(B).filter(function(sid){ return sid !== idA; });
+  }
+
+  function bindLinkRelativeEvents(mode){
+    document.getElementById("cancelBtn").addEventListener("click", closeSheet);
+    if (mode.type === "link-relative-pick-slot"){
+      var slotBtns = document.getElementById("linkSlotBtns");
+      if (slotBtns){
+        slotBtns.addEventListener("click", function(e){
+          var btn = e.target.closest("button[data-rel]");
+          if (!btn) return;
+          openSheet({type:"link-relative", rel:btn.getAttribute("data-rel"), forId:mode.forId});
+        });
+      }
+    } else if (mode.type === "link-relative"){
+      var confirmBtn = document.getElementById("linkConfirmBtn");
+      if (confirmBtn){
+        confirmBtn.addEventListener("click", function(){
+          var select = document.getElementById("linkPersonSelect");
+          linkExistingRelative(mode.rel, mode.forId, select.value);
+          saveState();
+          render();
+          closeSheet();
+          showToast("Привязано");
+        });
+      }
+    }
+  }
+
+  // Sets an EXISTING person as forId's father/mother/spouse, instead of
+  // addRelative's usual "create a brand-new person" path. Also pairs a
+  // newly-linked father/mother with forId's other already-known parent as
+  // spouses, same as addRelative does — this is exactly how a mother who
+  // was only linked as a spouse after her kids already existed gets fixed:
+  // open each kid, link the existing mother in directly.
+  function linkExistingRelative(rel, forId, otherId){
+    var forPerson = state.people[forId];
+    var other = state.people[otherId];
+    if (!forPerson || !other) return;
+    if (rel === "father"){
+      forPerson.fatherId = otherId;
+      if (forPerson.motherId && state.people[forPerson.motherId]) linkSpouses(otherId, forPerson.motherId);
+    } else if (rel === "mother"){
+      forPerson.motherId = otherId;
+      if (forPerson.fatherId && state.people[forPerson.fatherId]) linkSpouses(otherId, forPerson.fatherId);
+    } else if (rel === "spouse"){
+      linkSpouses(forId, otherId);
+    }
   }
 
   function addRelative(rel, forId, data){
