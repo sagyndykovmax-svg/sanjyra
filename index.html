@@ -261,6 +261,27 @@
   .qr-holder svg{width:100%; height:100%; display:block;}
   .qr-box .btn{width:100%; justify-content:center; padding:12px 14px;}
 
+  /* ---------- kinship calculator overlay ---------- */
+  .kinship-overlay{
+    position:fixed; inset:0; z-index:65; background:rgba(10,8,4,0.72); display:none;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .kinship-overlay.open{display:flex;}
+  .kinship-box{
+    background:var(--surface-2); border-radius:20px; padding:26px 24px 22px;
+    max-width:400px; width:100%; box-shadow:var(--shadow); max-height:88vh; overflow-y:auto;
+  }
+  .kinship-box h3{font-family:var(--font-display); font-weight:400; font-size:18px; margin:0 0 4px; text-align:center;}
+  .kinship-box > .subnote{text-align:center; margin-bottom:18px;}
+  .kinship-result{
+    background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; font-size:13.5px; line-height:1.5; margin:16px 0 18px; min-height:20px;
+  }
+  .kinship-result p{margin:0 0 8px;}
+  .kinship-result p:last-child{margin-bottom:0;}
+  .kinship-result .muted{color:var(--ink-muted); font-size:12.5px;}
+  .kinship-box .btn{width:100%; justify-content:center; padding:12px 14px;}
+
   .fab{
     position:absolute; right:20px; bottom:22px; z-index:15;
     width:54px; height:54px; border-radius:50%; border:none;
@@ -346,6 +367,11 @@
     border:1px solid var(--line-strong); border-radius:10px; padding:10px 12px; resize:vertical;
   }
   .field input:focus, .field textarea:focus{outline:none; border-color:var(--accent);}
+  .field select{
+    width:100%; font-family:inherit; font-size:16px; color:var(--ink); background:var(--surface);
+    border:1px solid var(--line-strong); border-radius:10px; padding:10px 12px;
+  }
+  .field select:focus{outline:none; border-color:var(--accent);}
   .pillrow{display:flex; gap:8px; flex-wrap:wrap;}
   .pill{
     padding:8px 14px; border-radius:999px; border:1px solid var(--line-strong); background:var(--surface);
@@ -487,6 +513,7 @@
       <button class="btn btn-ghost" id="btnMore" title="Ещё" aria-label="Ещё">⋯</button>
       <div class="more-menu" id="moreMenu">
         <button class="btn btn-ghost" id="btnSearch" title="Найти человека"><span>🔍</span><span class="lbl">Найти</span></button>
+        <button class="btn btn-ghost" id="btnKinship" title="Посчитать родство между двумя людьми"><span>🧬</span><span class="lbl">Родство</span></button>
         <button class="btn btn-ghost" id="btnExample" title="Посмотреть пример дерева"><span>📖</span><span class="lbl">Пример</span></button>
         <button class="btn btn-ghost" id="btnFit" title="Показать всё дерево"><span>⤢</span><span class="lbl">Показать всё</span></button>
         <button class="btn btn-ghost" id="btnShorten" title="Получить короткую ссылку" style="display:none;">Короче</button>
@@ -600,6 +627,17 @@
   </div>
 </div>
 
+<div class="kinship-overlay" id="kinshipOverlay">
+  <div class="kinship-box">
+    <h3>Кем приходится?</h3>
+    <p class="subnote">Считает только кровное родство (и прямой брак между выбранными) — не берёт в расчёт свойство через брак вроде тестя или зятя.</p>
+    <div class="field"><label>Первый человек</label><select id="kinshipSelectA"></select></div>
+    <div class="field" style="margin-bottom:0;"><label>Второй человек</label><select id="kinshipSelectB"></select></div>
+    <div class="kinship-result" id="kinshipResult"></div>
+    <button class="btn btn-ghost" id="kinshipClose">Закрыть</button>
+  </div>
+</div>
+
 <div class="confirm" id="confirmBox">
   <div class="confirm-box">
     <p id="confirmText"></p>
@@ -647,6 +685,10 @@
     searchPop: document.getElementById("searchPop"),
     searchInput: document.getElementById("searchInput"),
     searchResults: document.getElementById("searchResults"),
+    kinshipOverlay: document.getElementById("kinshipOverlay"),
+    kinshipSelectA: document.getElementById("kinshipSelectA"),
+    kinshipSelectB: document.getElementById("kinshipSelectB"),
+    kinshipResult: document.getElementById("kinshipResult"),
     confirmBox: document.getElementById("confirmBox"),
     confirmText: document.getElementById("confirmText"),
     confirmYes: document.getElementById("confirmYes"),
@@ -2437,6 +2479,165 @@
   });
   document.getElementById("qrClose").addEventListener("click", function(){
     document.getElementById("qrOverlay").classList.remove("open");
+  });
+
+  /* ---------------- kinship calculator ----------------
+     Only blood relations (through fatherId/motherId) plus a direct
+     spouse-of-each-other check. Deliberately does NOT attempt in-law
+     terms (тесть/свёкор/зять/невестка etc.) — those depend on the
+     gender of whoever's asking, not just the two people involved, and
+     a wrong guess there is worse than the calculator staying quiet
+     about it. Same reasoning for kinship past the well-established
+     terms below: past a certain distance it falls back to a plain,
+     always-correct description instead of inventing a folk term. */
+
+  function ancestorDistances(id){
+    var dist = {};
+    var queue = [{id:id, d:0}];
+    while (queue.length){
+      var item = queue.shift();
+      if (dist[item.id] !== undefined) continue;
+      dist[item.id] = item.d;
+      var p = state.people[item.id];
+      if (!p) continue;
+      if (p.fatherId && state.people[p.fatherId]) queue.push({id:p.fatherId, d:item.d+1});
+      if (p.motherId && state.people[p.motherId]) queue.push({id:p.motherId, d:item.d+1});
+    }
+    return dist;
+  }
+
+  function findClosestCommonAncestor(idA, idB){
+    var distA = ancestorDistances(idA), distB = ancestorDistances(idB);
+    var best = null;
+    Object.keys(distA).forEach(function(id){
+      if (distB[id] === undefined) return;
+      var p = distA[id], q = distB[id], total = p + q;
+      if (!best || total < best.total || (total === best.total && Math.max(p,q) < Math.max(best.p,best.q))){
+        best = {id:id, p:p, q:q, total:total};
+      }
+    });
+    return best;
+  }
+
+  // n = generations up from a person to this ancestor. n=1 parent, n=2
+  // grandparent, n=3 great-grandparent (прабабушка/прадедушка), each n
+  // beyond that adds one more "пра-" — прапрабабушка, прапрапрабабушка...
+  function ordinalAncestorTerm(gender, n){
+    if (n === 1) return gender === "f" ? "мать" : (gender === "m" ? "отец" : "родитель");
+    if (n === 2) return gender === "f" ? "бабушка" : (gender === "m" ? "дедушка" : "прародитель");
+    var praCount = n - 2;
+    var base = gender === "f" ? "бабушка" : (gender === "m" ? "дедушка" : "предок");
+    return "пра".repeat(praCount) + base;
+  }
+  function ordinalDescendantTerm(gender, n){
+    if (n === 1) return gender === "f" ? "дочь" : (gender === "m" ? "сын" : "ребёнок");
+    if (n === 2) return gender === "f" ? "внучка" : (gender === "m" ? "внук" : "внук(-чка)");
+    var praCount = n - 2;
+    var base = gender === "f" ? "внучка" : (gender === "m" ? "внук" : "потомок");
+    return "пра".repeat(praCount) + base;
+  }
+  var COUSIN_STEM = [null, "двоюродн", "троюродн", "четвероюродн", "пятиюродн", "шестиюродн", "семиюродн", "восьмиюродн", "девятиюродн", "десятиюродн"];
+  function cousinTerm(gender, degree){
+    var stem = COUSIN_STEM[degree];
+    if (!stem) return null;
+    if (gender === "f") return stem + "ая сестра";
+    if (gender === "m") return stem + "ый брат";
+    return stem + "ый(-ая) брат/сестра";
+  }
+  function auntUncleTerm(gender){ return gender === "f" ? "тётя" : (gender === "m" ? "дядя" : "тётя/дядя"); }
+  function nieceNephewTerm(gender){ return gender === "f" ? "племянница" : (gender === "m" ? "племянник" : "племянник/племянница"); }
+
+  // p = viewer's distance from the shared ancestor, q = subject's distance —
+  // returns what the subject IS to the viewer, e.g. termForSubject(1, 2, ...)
+  // reads "for someone 1 generation from the ancestor, someone 2 generations
+  // from it is their niece/nephew".
+  function termForSubject(p, q, subject, personA, personB){
+    if (p === 0 && q === 0) return "тот же человек";
+    if (p === 0) return ordinalDescendantTerm(subject.gender, q); // subject is viewer's descendant
+    if (q === 0) return ordinalAncestorTerm(subject.gender, p); // subject is viewer's ancestor
+    if (p === 1 && q === 1){
+      var sharedFather = personA.fatherId && personA.fatherId === personB.fatherId;
+      var sharedMother = personA.motherId && personA.motherId === personB.motherId;
+      var full = sharedFather && sharedMother;
+      if (subject.gender === "f") return full ? "родная сестра" : "сестра (по одному из родителей)";
+      if (subject.gender === "m") return full ? "родной брат" : "брат (по одному из родителей)";
+      return full ? "родной(-ая) брат/сестра" : "брат/сестра (по одному из родителей)";
+    }
+    if (p === 1 && q === 2) return nieceNephewTerm(subject.gender);
+    if (p === 2 && q === 1) return auntUncleTerm(subject.gender);
+    if (p === q) return cousinTerm(subject.gender, p - 1);
+    return null; // uncertain — caller falls back to a plain description
+  }
+
+  function fallbackDescription(common, nameA, nameB){
+    var ancestor = state.people[common.id];
+    var ancestorName = (ancestor && ancestor.name) || "общий предок";
+    var ancestorGender = ancestor ? ancestor.gender : "u";
+    var legA = common.p === 0 ? "тот же человек" : ordinalAncestorTerm(ancestorGender, common.p);
+    var legB = common.q === 0 ? "тот же человек" : ordinalAncestorTerm(ancestorGender, common.q);
+    return escapeHtml(ancestorName) + ' — их общий предок: для ' + escapeHtml(nameA) + ' это ' + escapeHtml(legA) +
+      ', для ' + escapeHtml(nameB) + ' — ' + escapeHtml(legB) +
+      '. <span class="muted">Точное короткое название такой степени родства не определяю, чтобы не ошибиться.</span>';
+  }
+
+  function renderKinshipResult(){
+    var idA = els.kinshipSelectA.value, idB = els.kinshipSelectB.value;
+    var A = state.people[idA], B = state.people[idB];
+    if (!A || !B){ els.kinshipResult.innerHTML = ""; return; }
+    var nameA = A.name || "Без имени", nameB = B.name || "Без имени";
+    if (idA === idB){
+      els.kinshipResult.innerHTML = "<p>Это один и тот же человек.</p>";
+      return;
+    }
+    if (A.spouseId === idB || B.spouseId === idA){
+      var spouseTerm = B.gender === "f" ? "супруга" : (B.gender === "m" ? "супруг" : "супруг(а)");
+      els.kinshipResult.innerHTML = "<p>" + escapeHtml(nameB) + " — " + spouseTerm + " для " + escapeHtml(nameA) + ".</p>";
+      return;
+    }
+    var common = findClosestCommonAncestor(idA, idB);
+    if (!common){
+      els.kinshipResult.innerHTML = '<p class="muted">Общего предка в дереве не нашли — возможно, родство через брак, или ветви ещё не связаны в дереве.</p>';
+      return;
+    }
+    var termB = termForSubject(common.p, common.q, B, A, B); // B, from A's side
+    var termA = termForSubject(common.q, common.p, A, B, A); // A, from B's side
+    if (termB && termA){
+      els.kinshipResult.innerHTML =
+        "<p>" + escapeHtml(nameB) + " приходится " + escapeHtml(nameA) + " — <strong>" + escapeHtml(termB) + "</strong>.</p>" +
+        "<p>" + escapeHtml(nameA) + " приходится " + escapeHtml(nameB) + " — <strong>" + escapeHtml(termA) + "</strong>.</p>";
+      return;
+    }
+    els.kinshipResult.innerHTML = "<p>" + fallbackDescription(common, nameA, nameB) + "</p>";
+  }
+
+  function populateKinshipSelects(){
+    var ids = Object.keys(state.people).sort(function(a,b){
+      return (state.people[a].name||"").localeCompare(state.people[b].name||"", "ru");
+    });
+    var optionsHtml = ids.map(function(id){
+      var p = state.people[id];
+      var years = p.birth || p.death ? " (" + (p.birth||"?") + "–" + (p.death||"…") + ")" : "";
+      return '<option value="' + id + '">' + escapeHtml(p.name || "Без имени") + escapeHtml(years) + '</option>';
+    }).join("");
+    els.kinshipSelectA.innerHTML = optionsHtml;
+    els.kinshipSelectB.innerHTML = optionsHtml;
+    if (ids.length > 1) els.kinshipSelectB.value = ids[1];
+  }
+
+  document.getElementById("btnKinship").addEventListener("click", function(){
+    moreMenu.classList.remove("open");
+    if (personCount() < 2){
+      showToast("Нужно хотя бы два человека в дереве");
+      return;
+    }
+    populateKinshipSelects();
+    renderKinshipResult();
+    els.kinshipOverlay.classList.add("open");
+  });
+  els.kinshipSelectA.addEventListener("change", renderKinshipResult);
+  els.kinshipSelectB.addEventListener("change", renderKinshipResult);
+  document.getElementById("kinshipClose").addEventListener("click", function(){
+    els.kinshipOverlay.classList.remove("open");
   });
 
   document.getElementById("btnShorten").addEventListener("click", function(){
